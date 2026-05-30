@@ -33,7 +33,7 @@ func (s *Subsonic) User(user database.User) (*User, error) {
 		Client:     &http.Client{},
 		BaseUrl:    s.cfg.URL,
 		User:       user.SubsonicUser,
-		ClientName: "RW",
+		ClientName: "Musikat",
 	}
 
 	err := client.Authenticate(user.SubsonicPass)

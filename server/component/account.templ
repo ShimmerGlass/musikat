@@ -1,0 +1,218 @@
+package component
+
+templ Account() {
+	@Layout("Account", adminMenu()) {
+		{{ user := UserFromCtx(ctx) }}
+		<div class="mx-auto max-w-3xl px-6 py-12">
+			<!-- Header -->
+			<div class="mb-8">
+				<h1 class="text-3xl font-bold">Account Settings</h1>
+				<p class="mt-2 text-sm text-gray-600">
+					Manage your account and integrations.
+				</p>
+			</div>
+			<div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+				<!-- Tabs -->
+				<div class="flex border-b border-gray-200 bg-gray-50">
+					<button
+						onclick="showTab('profile')"
+						id="tab-profile"
+						class="tab-button border-b-2 border-gray-900 px-6 py-4 text-sm font-semibold text-gray-900"
+					>
+						Basic Info
+					</button>
+					<button
+						onclick="showTab('password')"
+						id="tab-password"
+						class="tab-button border-b-2 border-transparent px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700"
+					>
+						Password
+					</button>
+					<button
+						onclick="showTab('subsonic')"
+						id="tab-subsonic"
+						class="tab-button border-b-2 border-transparent px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700"
+					>
+						Subsonic
+					</button>
+					<button
+						onclick="showTab('notifications')"
+						id="tab-notitications"
+						class="tab-button border-b-2 border-transparent px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700"
+					>
+						Notifications
+					</button>
+				</div>
+				<!-- Profile Tab -->
+				<div id="content-profile" class="tab-content p-8">
+					<form action="" method="post" class="space-y-6">
+						<div>
+							<label class="mb-2 block text-sm font-medium text-gray-700">
+								Name
+							</label>
+							<input
+								type="text"
+								value={ user.Name }
+								name="name"
+								class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+							/>
+						</div>
+						<div class="flex justify-end">
+							<button
+								type="submit"
+								class="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
+							>
+								Save Basic Info
+							</button>
+						</div>
+						<input name="type" value="info" type="hidden"/>
+					</form>
+				</div>
+				<!-- Password Tab -->
+				<div id="content-password" class="tab-content hidden p-8">
+					<form action="" method="post" class="space-y-6">
+						<div>
+							<label class="mb-2 block text-sm font-medium text-gray-700">
+								Current Password
+							</label>
+							<input
+								type="password"
+								name="current_pass"
+								class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+							/>
+						</div>
+						<div>
+							<label class="mb-2 block text-sm font-medium text-gray-700">
+								New Password
+							</label>
+							<input
+								type="password"
+								name="new_pass"
+								class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+							/>
+						</div>
+						<div>
+							<label class="mb-2 block text-sm font-medium text-gray-700">
+								Confirm Password
+							</label>
+							<input
+								type="password"
+								name="confirm_pass"
+								class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+							/>
+						</div>
+						<div class="flex justify-end">
+							<button
+								type="submit"
+								class="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
+							>
+								Change Password
+							</button>
+						</div>
+						<input name="type" value="password" type="hidden"/>
+					</form>
+				</div>
+				<!-- Subsonic Tab -->
+				<div id="content-subsonic" class="tab-content hidden p-8">
+					<form action="" method="post" class="space-y-6">
+						<div>
+							<label class="mb-2 block text-sm font-medium text-gray-700">
+								Subsonic Username
+							</label>
+							<input
+								type="text"
+								name="subsonic_user"
+								value={ user.SubsonicUser }
+								class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+							/>
+						</div>
+						<div>
+							<label class="mb-2 block text-sm font-medium text-gray-700">
+								Subsonic Password
+							</label>
+							<input
+								type="password"
+								name="subsonic_pass"
+								if user.SubsonicPass != "" {
+									placeholder="••••••••"
+								}
+								class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+							/>
+						</div>
+						<div class="flex justify-end">
+							<button
+								type="submit"
+								class="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
+							>
+								Save Subsonic Settings
+							</button>
+						</div>
+						<input name="type" value="subsonic" type="hidden"/>
+					</form>
+				</div>
+				<!-- Notifications Tab -->
+				<div id="content-notifications" class="tab-content hidden p-8">
+					<form action="" method="post" class="space-y-6">
+						<div>
+							<label class="mb-2 block text-sm font-medium text-gray-700">
+								XMPP JID
+							</label>
+							<input
+								type="text"
+								name="xmpp_jid"
+								value={ user.XMPPJID }
+								class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+							/>
+						</div>
+						<div class="flex justify-end">
+							<button
+								type="submit"
+								class="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
+							>
+								Save XMPP Settings
+							</button>
+						</div>
+						<input name="type" value="notifications" type="hidden"/>
+					</form>
+				</div>
+			</div>
+		</div>
+		<script>
+			function showTab(name) {
+				document.querySelectorAll('.tab-content').forEach(el => {
+					el.classList.add('hidden');
+				});
+
+				document.querySelectorAll('.tab-button').forEach(el => {
+					el.classList.remove(
+					'border-gray-900',
+					'text-gray-900'
+					);
+
+					el.classList.add(
+					'border-transparent',
+					'text-gray-500'
+					);
+				});
+
+				document
+					.getElementById('content-' + name)
+					.classList.remove('hidden');
+
+				document
+					.getElementById('tab-' + name)
+					.classList.remove(
+					'border-transparent',
+					'text-gray-500'
+					);
+
+				document
+					.getElementById('tab-' + name)
+					.classList.add(
+					'border-gray-900',
+					'text-gray-900'
+					);
+			}
+  		</script>
+	}
+}

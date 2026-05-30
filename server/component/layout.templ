@@ -1,0 +1,96 @@
+package component
+
+import "strings"
+
+templ Layout(title string, menu templ.Component) {
+	@page(title) {
+		{{ user := UserFromCtx(ctx) }}
+		<div class="flex h-screen">
+			<!-- Sidebar -->
+			<aside class="w-64 bg-gray-900 text-white flex flex-col">
+				<div class="px-6 py-4 border-b border-gray-800">
+					<h1 class="text-xl font-bold h-10 flex items-center justify-center">
+						Musikat
+					</h1>
+				</div>
+				<nav class="flex-1 px-4 py-6 space-y-2">
+					@menu
+				</nav>
+			</aside>
+			<!-- Main content -->
+			<div class="flex-1 flex flex-col overflow-hidden">
+				<!-- Topbar -->
+				<header class="bg-white border-b border-gray-200">
+					<div class="flex items-center justify-between px-6 py-4">
+						<div class="flex items-center space-x-6">
+							<a href="/" class="text-sm font-medium hover:text-blue-600">
+								Home
+							</a>
+							<a href="/admin/users" class="text-sm font-medium hover:text-blue-600">
+								Settings
+							</a>
+						</div>
+						<div class="relative">
+							<!-- Trigger -->
+							<button
+								onclick="toggleUserMenu()"
+								class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white hover:bg-black"
+							>
+								{ strings.ToUpper( user.Name[:1]) }
+							</button>
+							<!-- Dropdown -->
+							<div
+								id="user-menu"
+								class="absolute right-0 mt-2 hidden w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+							>
+								<div class="border-b border-gray-100 px-4 py-3">
+									<div class="font-medium text-gray-900">
+										{ user.Name }
+									</div>
+									<div class="text-sm text-gray-500">
+										{ user.ID }
+									</div>
+								</div>
+								<div class="py-2">
+									<a
+										href="/account"
+										class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+									>
+										Account Settings
+									</a>
+								</div>
+								<div class="border-t border-gray-100 py-2">
+									<a
+										href="/logout"
+										class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+									>
+										Sign Out
+									</a>
+								</div>
+							</div>
+						</div>
+					</div>
+				</header>
+				<!-- Content -->
+				<main class="flex-1 overflow-y-auto p-6">
+					{ children... }
+				</main>
+			</div>
+		</div>
+		<script>
+			function toggleUserMenu() {
+				document
+				.getElementById('user-menu')
+				.classList.toggle('hidden');
+			}
+
+			document.addEventListener('click', function (event) {
+				const menu = document.getElementById('user-menu');
+
+				if (!event.target.closest('.relative')) {
+					menu.classList.add('hidden');
+				}
+			});
+		</script>
+	}
+}

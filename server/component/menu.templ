@@ -1,0 +1,17 @@
+package component
+
+import "strings"
+
+templ menuItem(title, url string) {
+	{{ isCurrent := strings.HasPrefix(URLFromCtx(ctx), url) }}
+	<a
+		href={ url }
+		class={ "flex items-center justify-between rounded-lg px-4 py-2 transition",
+        templ.KV("bg-gray-700", isCurrent),
+        templ.KV("hover:bg-gray-600", isCurrent),
+        templ.KV("hover:bg-gray-800", !isCurrent) }
+	>
+		<span>{ title }</span>
+		{ children... }
+	</a>
+}

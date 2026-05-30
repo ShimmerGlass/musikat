@@ -1,0 +1,123 @@
+package component
+
+templ Setup() {
+	@page("Initial setup") {
+		<div class="flex min-h-screen items-center justify-center px-6 py-12">
+			<div class="w-full max-w-2xl">
+				<!-- Logo / Intro -->
+				<div class="mb-8 text-center">
+					<div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-900 text-2xl font-bold text-white">
+						M
+					</div>
+					<h1 class="text-4xl font-bold text-gray-900">
+						Welcome to Musikat
+					</h1>
+					<p class="mt-3 text-gray-600">
+						Create the first administrator account to finish setup.
+					</p>
+				</div>
+				<!-- Setup Card -->
+				<div class="rounded-3xl border border-gray-200 bg-white shadow-sm">
+					<!-- Step Header -->
+					<div class="border-b border-gray-200 px-8 py-6">
+						<div class="flex items-center gap-4">
+							<div class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white">
+								1
+							</div>
+							<div>
+								<h2 class="text-lg font-semibold text-gray-900">
+									Administrator Account
+								</h2>
+								<p class="text-sm text-gray-500">
+									This account will have full access to the system.
+								</p>
+							</div>
+						</div>
+					</div>
+					<!-- Form -->
+					<form class="space-y-8 p-8" action="" method="post">
+						<!-- Account Fields -->
+						<div class="grid gap-6 md:grid-cols-2">
+							<!-- Login -->
+							<div class="md:col-span-2">
+								<label
+									for="login"
+									class="mb-2 block text-sm font-medium text-gray-700"
+								>
+									Login
+								</label>
+								<input
+									id="login"
+									name="login"
+									type="text"
+									placeholder="admin"
+									class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+								/>
+							</div>
+							<!-- Name -->
+							<div class="md:col-span-2">
+								<label
+									for="name"
+									class="mb-2 block text-sm font-medium text-gray-700"
+								>
+									Display Name
+								</label>
+								<input
+									id="name"
+									name="name"
+									type="text"
+									placeholder="Alice Smith"
+									class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+								/>
+							</div>
+							<!-- Password -->
+							<div>
+								<label
+									for="password"
+									class="mb-2 block text-sm font-medium text-gray-700"
+								>
+									Password
+								</label>
+								<input
+									id="password"
+									name="password"
+									type="password"
+									placeholder="••••••••"
+									class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+								/>
+							</div>
+							<!-- Confirm Password -->
+							<div>
+								<label
+									for="confirm_password"
+									class="mb-2 block text-sm font-medium text-gray-700"
+								>
+									Confirm Password
+								</label>
+								<input
+									id="confirm_password"
+									name="confirm_password"
+									type="password"
+									placeholder="••••••••"
+									class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+								/>
+							</div>
+						</div>
+						<!-- Submit -->
+						<div class="flex items-center justify-between border-t border-gray-200 pt-6">
+							<div class="text-sm text-gray-500">
+								Initial setup only needs to be completed once.
+							</div>
+							<button
+								type="submit"
+								class="rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-black"
+							>
+								Complete Setup
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	}
+}

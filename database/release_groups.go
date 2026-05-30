@@ -1,0 +1,149 @@
+package database
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/doug-martin/goqu/v9"
+)
+
+const (
+	tableReleaseGroups       = "release_groups"
+	tableReleaseGroupArtists = "release_group_artists"
+)
+
+type ReleaseGroup struct {
+	MBzID       string `db:"mb_id" yaml:"m_bz_id"`
+	Name        string `db:"name" yaml:"name"`
+	ReleaseType string `db:"release_type"`
+	ReleaseDate string `db:"release_date"`
+	InLibrary   bool   `db:"in_library" yaml:"in_library"`
+
+	Artists []Artist `db:"-" yaml:"artists"`
+}
+
+func (r ReleaseGroup) URL() string {
+	return fmt.Sprintf("https://musicbrainz.org/release-group/%s", r.MBzID)
+}
+
+func (d *DB) AddReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
+	_, err := d.gq.Insert(tableReleaseGroups).
+		Rows(rg).
+		OnConflict(goqu.DoUpdate("mb_id", goqu.Record{
+			"name":       goqu.L("excluded.name"),
+			"in_library": goqu.L("excluded.in_library"),
+		})).
+		Executor().ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("add release group: %w", err)
+	}
+
+	return nil
+}
+
+func (d *DB) AddReleaseGroupWithArtists(ctx context.Context, rg ReleaseGroup) error {
+	err := d.AddReleaseGroup(ctx, rg)
+	if err != nil {
+		return err
+	}
+
+	err = d.replaceReleaseGroupArtists(ctx, rg)
+	if err != nil {
+		return fmt.Errorf("add release group: %w", err)
+	}
+
+	return nil
+}
+
+func (d *DB) replaceReleaseGroupArtists(ctx context.Context, rg ReleaseGroup) error {
+	_, err := d.gq.
+		Delete(tableReleaseGroupArtists).
+		Where(goqu.Ex{
+			"release_group_mb_id": rg.MBzID,
+		}).
+		Executor().ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("replace release group artists: %w", err)
+	}
+
+	recs := make([]any, 0, len(rg.Artists))
+	for _, artist := range rg.Artists {
+		recs = append(recs, goqu.Record{
+			"release_group_mb_id": rg.MBzID,
+			"artist_mb_id":        artist.MBzID,
+		})
+	}
+
+	_, err = d.gq.
+		Insert(tableReleaseGroupArtists).
+		Rows(recs...).
+		Executor().ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("replace release group artists: %w", err)
+	}
+
+	return nil
+}
+
+func (d *DB) ListReleaseGroups(ctx context.Context) ([]ReleaseGroup, error) {
+	scanner, err := d.gq.
+		Select("*").
+		From(tableReleaseGroups).
+		Executor().ScannerContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list release groups: select: %w", err)
+	}
+	defer scanner.Close()
+
+	return scan[ReleaseGroup](scanner)
+}
+
+func (d *DB) artistReleaseGroups(ctx context.Context, artist Artist) ([]ReleaseGroup, error) {
+	scanner, err := d.gq.
+		Select(fmt.Sprintf("%s.*", tableReleaseGroups)).
+		From(tableReleaseGroups).
+		Join(goqu.T(tableReleaseGroupArtists), goqu.On(goqu.I("release_group_mb_id").Eq(goqu.I("mb_id")))).
+		Where(goqu.C("artist_mb_id").Eq(artist.MBzID)).
+		Order(goqu.I("release_date").Desc()).
+		Executor().ScannerContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list release groups: select: %w", err)
+	}
+	defer scanner.Close()
+
+	return scan[ReleaseGroup](scanner)
+}
+
+func (d *DB) ArtistReleaseGroups(ctx context.Context, artist Artist) ([]ReleaseGroup, error) {
+	rgs, err := d.artistReleaseGroups(ctx, artist)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, rg := range rgs {
+		artists, err := d.releaseGroupArtists(ctx, rg)
+		if err != nil {
+			return nil, err
+		}
+
+		rg.Artists = artists
+		rgs[i] = rg
+	}
+
+	return rgs, nil
+}
+
+func (d *DB) releaseGroupArtists(ctx context.Context, rg ReleaseGroup) ([]Artist, error) {
+	artists := []Artist{}
+	err := d.gq.
+		Select(fmt.Sprintf("%s.*", tableArtists)).
+		From(tableArtists).
+		Join(goqu.T(tableReleaseGroupArtists), goqu.On(goqu.I("artist_mb_id").Eq(goqu.I("mb_id")))).
+		Where(goqu.C("release_group_mb_id").Eq(rg.MBzID)).
+		Executor().ScanStructsContext(ctx, &artists)
+	if err != nil {
+		return nil, fmt.Errorf("list release groups artists: %w", err)
+	}
+
+	return artists, nil
+}

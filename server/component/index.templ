@@ -1,0 +1,7 @@
+package component
+
+import "github.com/shimmerglass/musikat/database"
+
+templ Index(artists []database.ArtistWithStats) {
+	@Layout("Home", artistsMenu(artists))
+}

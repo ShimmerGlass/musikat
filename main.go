@@ -44,7 +44,7 @@ func run() error {
 		notif = &notification.Noop{}
 	}
 
-	tasks := task.New(db, mbz, sub, notif)
+	tasks := task.New(cfg.Refresh, db, mbz, sub, notif)
 	tasks.Start()
 
 	srv := server.New(cfg.Server, db)

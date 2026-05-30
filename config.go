@@ -8,10 +8,12 @@ import (
 	"github.com/shimmerglass/musikat/notification"
 	"github.com/shimmerglass/musikat/server"
 	"github.com/shimmerglass/musikat/subsonic"
+	"github.com/shimmerglass/musikat/task"
 )
 
 type Config struct {
 	DB       database.Config         `env:", prefix=DB_"`
+	Refresh  task.Config             `env:", prefix=REFRESH_"`
 	Subsonic subsonic.Config         `env:", prefix=SUBSONIC_"`
 	Server   server.Config           `env:", prefix=SERVER_"`
 	XMPP     notification.XMPPConfig `env:", prefix=XMPP_"`

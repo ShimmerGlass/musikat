@@ -25,7 +25,7 @@ func (s *Server) loginHandler(ctx context.Context, rw http.ResponseWriter, r *ht
 	userName := r.Form.Get("user")
 	password := r.Form.Get("password")
 
-	user, err := s.db.UserByID(ctx, userName)
+	user, err := s.db.User(ctx, userName)
 	if err != nil {
 		return err
 	}

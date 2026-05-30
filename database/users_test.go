@@ -14,7 +14,7 @@ func TestUserCreate(t *testing.T) {
 		err := db.AddUser(ctx, u)
 		require.NoError(t, err)
 
-		users, err := db.ListUsers(ctx)
+		users, err := db.Users(ctx)
 		require.NoError(t, err)
 
 		require.Len(t, users, 1)
@@ -32,7 +32,7 @@ func TestUserUpdate(t *testing.T) {
 		err = db.AddUser(ctx, u)
 		require.NoError(t, err)
 
-		users, err := db.ListUsers(ctx)
+		users, err := db.Users(ctx)
 		require.NoError(t, err)
 
 		require.Len(t, users, 1)

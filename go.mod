@@ -92,11 +92,13 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
 	github.com/googleapis/gax-go/v2 v2.17.0 // indirect
+	github.com/gordonklaus/ineffassign v0.2.0 // indirect
 	github.com/hashicorp/aws-sdk-go-base/v2 v2.0.0-beta.72 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-getter v1.8.6 // indirect
 	github.com/hashicorp/go-version v1.8.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/kisielk/errcheck v1.20.0 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
@@ -162,4 +164,6 @@ require (
 tool (
 	github.com/a-h/templ/cmd/templ
 	github.com/go-task/task/v3/cmd/task
+	github.com/gordonklaus/ineffassign
+	github.com/kisielk/errcheck
 )

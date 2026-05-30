@@ -55,7 +55,7 @@ func handle(do handler) http.Handler {
 
 		err := do(ctx, w, r)
 		if err != nil {
-			component.Error(err).Render(ctx, w)
+			_ = component.Error(err).Render(ctx, w)
 		}
 	})
 }

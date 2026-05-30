@@ -24,7 +24,7 @@ func NewSendNotifications(
 }
 
 func (t *SendNotifications) Run(ctx context.Context) error {
-	users, err := t.db.ListUsers(ctx)
+	users, err := t.db.Users(ctx)
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func (t *SendNotifications) Run(ctx context.Context) error {
 }
 
 func (t *SendNotifications) runUser(ctx context.Context, user database.User) error {
-	artists, err := t.db.ListUserWatchedArtists(ctx, user)
+	artists, err := t.db.UserWatchedArtists(ctx, user)
 	if err != nil {
 		return err
 	}

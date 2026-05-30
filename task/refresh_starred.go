@@ -23,7 +23,7 @@ func NewRefreshStarred(db *database.DB, sub *subsonic.Subsonic) *RefreshStarred 
 func (t *RefreshStarred) Run(ctx context.Context) error {
 	slog.Info("refreshing starred artists")
 
-	users, err := t.db.ListUsers(ctx)
+	users, err := t.db.Users(ctx)
 	if err != nil {
 		return err
 	}

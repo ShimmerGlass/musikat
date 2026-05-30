@@ -57,7 +57,7 @@ func (s *Server) auth(ctx context.Context, r *http.Request) (database.User, bool
 		return database.User{}, false, nil
 	}
 
-	user, err := s.db.UserByID(ctx, claims.UserID)
+	user, err := s.db.User(ctx, claims.UserID)
 	if errors.Is(err, database.ErrUserNotFound) {
 		return database.User{}, false, nil
 	}
@@ -69,7 +69,7 @@ func (s *Server) auth(ctx context.Context, r *http.Request) (database.User, bool
 }
 
 func (s *Server) loginRedirect(ctx context.Context, rw http.ResponseWriter, r *http.Request) error {
-	users, err := s.db.ListUsers(ctx)
+	users, err := s.db.Users(ctx)
 	if err != nil {
 		return err
 	}

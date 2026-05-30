@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Server) users(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
-	users, err := s.db.ListUsers(ctx)
+	users, err := s.db.Users(ctx)
 	if err != nil {
 		return err
 	}

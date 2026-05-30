@@ -3,11 +3,9 @@ package database
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
-	"github.com/doug-martin/goqu/v9/exec"
 	"github.com/shimmerglass/musikat/database/migration"
 	_ "modernc.org/sqlite"
 )
@@ -36,21 +34,4 @@ func New(cfg Config) (*DB, error) {
 		sql: db,
 		gq:  dialect.DB(db),
 	}, nil
-}
-
-func scan[T any](scanner exec.Scanner) ([]T, error) {
-	res := []T{}
-
-	for scanner.Next() {
-		var el T
-
-		err := scanner.ScanStruct(&el)
-		if err != nil {
-			return nil, fmt.Errorf("scan: %w", err)
-		}
-
-		res = append(res, el)
-	}
-
-	return res, nil
 }

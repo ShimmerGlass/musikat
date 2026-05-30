@@ -24,12 +24,12 @@ func NewRefreshArtistReleases(db *database.DB, mbz *musicbrainz.MusicBrainz) *Re
 func (t *RefreshArtistReleases) Run(ctx context.Context) error {
 	slog.Info("refreshing artist releases")
 
-	artists, err := t.db.ListWatchedArtists(ctx)
+	artists, err := t.db.WatchedArtists(ctx)
 	if err != nil {
 		return err
 	}
 
-	existing, err := t.db.ListReleaseGroups(ctx)
+	existing, err := t.db.ReleaseGroups(ctx)
 	if err != nil {
 		return err
 	}

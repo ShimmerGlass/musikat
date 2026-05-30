@@ -85,33 +85,35 @@ func (d *DB) replaceReleaseGroupArtists(ctx context.Context, rg ReleaseGroup) er
 	return nil
 }
 
-func (d *DB) ListReleaseGroups(ctx context.Context) ([]ReleaseGroup, error) {
-	scanner, err := d.gq.
+func (d *DB) ReleaseGroups(ctx context.Context) ([]ReleaseGroup, error) {
+	res := []ReleaseGroup{}
+
+	err := d.gq.
 		Select("*").
 		From(tableReleaseGroups).
-		Executor().ScannerContext(ctx)
+		Executor().ScanStructsContext(ctx, &res)
 	if err != nil {
-		return nil, fmt.Errorf("list release groups: select: %w", err)
+		return nil, fmt.Errorf("list release groups: %w", err)
 	}
-	defer scanner.Close()
 
-	return scan[ReleaseGroup](scanner)
+	return res, nil
 }
 
 func (d *DB) artistReleaseGroups(ctx context.Context, artist Artist) ([]ReleaseGroup, error) {
-	scanner, err := d.gq.
+	res := []ReleaseGroup{}
+
+	err := d.gq.
 		Select(fmt.Sprintf("%s.*", tableReleaseGroups)).
 		From(tableReleaseGroups).
 		Join(goqu.T(tableReleaseGroupArtists), goqu.On(goqu.I("release_group_mb_id").Eq(goqu.I("mb_id")))).
 		Where(goqu.C("artist_mb_id").Eq(artist.MBzID)).
 		Order(goqu.I("release_date").Desc()).
-		Executor().ScannerContext(ctx)
+		Executor().ScanStructsContext(ctx, &res)
 	if err != nil {
-		return nil, fmt.Errorf("list release groups: select: %w", err)
+		return nil, fmt.Errorf("list artist release groups: %w", err)
 	}
-	defer scanner.Close()
 
-	return scan[ReleaseGroup](scanner)
+	return res, nil
 }
 
 func (d *DB) ArtistReleaseGroups(ctx context.Context, artist Artist) ([]ReleaseGroup, error) {

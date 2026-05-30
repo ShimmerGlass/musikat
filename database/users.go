@@ -43,20 +43,21 @@ func (d *DB) AddUser(ctx context.Context, user User) error {
 	return nil
 }
 
-func (d *DB) ListUsers(ctx context.Context) ([]User, error) {
-	scanner, err := d.gq.
+func (d *DB) Users(ctx context.Context) ([]User, error) {
+	res := []User{}
+
+	err := d.gq.
 		Select("*").
 		From(tableUsers).
-		Executor().ScannerContext(ctx)
+		Executor().ScanStructsContext(ctx, &res)
 	if err != nil {
-		return nil, fmt.Errorf("list users: select: %w", err)
+		return nil, fmt.Errorf("list users: %w", err)
 	}
-	defer scanner.Close()
 
-	return scan[User](scanner)
+	return res, nil
 }
 
-func (d *DB) UserByID(ctx context.Context, id string) (User, error) {
+func (d *DB) User(ctx context.Context, id string) (User, error) {
 	user := User{}
 
 	ok, err := d.gq.
@@ -65,7 +66,7 @@ func (d *DB) UserByID(ctx context.Context, id string) (User, error) {
 		Where(goqu.C("id").Eq(id)).
 		Executor().ScanStructContext(ctx, &user)
 	if err != nil {
-		return User{}, fmt.Errorf("list users: select: %w", err)
+		return User{}, fmt.Errorf("users by id: %w", err)
 	}
 	if !ok {
 		return User{}, ErrUserNotFound

@@ -65,7 +65,7 @@ func (d *DB) Artist(ctx context.Context, mbzID string) (Artist, error) {
 	return artist, nil
 }
 
-func (d *DB) ListWatchedArtists(ctx context.Context) ([]Artist, error) {
+func (d *DB) WatchedArtists(ctx context.Context) ([]Artist, error) {
 	scanner, err := d.gq.
 		Select(fmt.Sprintf("%s.*", tableArtists)).
 		From(tableArtists).
@@ -74,7 +74,7 @@ func (d *DB) ListWatchedArtists(ctx context.Context) ([]Artist, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list watched artists: select: %w", err)
 	}
-	defer scanner.Close()
+	defer func() { _ = scanner.Close() }()
 
 	seen := map[string]bool{}
 	res := []Artist{}
@@ -98,7 +98,7 @@ func (d *DB) ListWatchedArtists(ctx context.Context) ([]Artist, error) {
 	return res, nil
 }
 
-func (d *DB) ListUserWatchedArtists(ctx context.Context, user User) ([]Artist, error) {
+func (d *DB) UserWatchedArtists(ctx context.Context, user User) ([]Artist, error) {
 	scanner, err := d.gq.
 		Select(fmt.Sprintf("%s.*", tableArtists)).
 		From(tableArtists).
@@ -110,7 +110,7 @@ func (d *DB) ListUserWatchedArtists(ctx context.Context, user User) ([]Artist, e
 	if err != nil {
 		return nil, fmt.Errorf("list watched artists: select: %w", err)
 	}
-	defer scanner.Close()
+	defer func() { _ = scanner.Close() }()
 
 	seen := map[string]bool{}
 	res := []Artist{}
@@ -134,8 +134,8 @@ func (d *DB) ListUserWatchedArtists(ctx context.Context, user User) ([]Artist, e
 	return res, nil
 }
 
-func (d *DB) ListUserWatchedArtistsWithStats(ctx context.Context, user User) ([]ArtistWithStats, error) {
-	artists, err := d.ListUserWatchedArtists(ctx, user)
+func (d *DB) UserWatchedArtistsWithStats(ctx context.Context, user User) ([]ArtistWithStats, error) {
+	artists, err := d.UserWatchedArtists(ctx, user)
 	if err != nil {
 		return nil, err
 	}

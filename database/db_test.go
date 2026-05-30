@@ -11,8 +11,9 @@ import (
 
 func WithDB(t *testing.T, do func(context.Context, *DB)) {
 	tmpdir, err := os.MkdirTemp(os.TempDir(), "db")
+	require.NoError(t, err)
 
-	defer os.RemoveAll(tmpdir)
+	defer func() { _ = os.RemoveAll(tmpdir) }()
 
 	db, err := New(Config{
 		Path: filepath.Join(tmpdir, "rw.db"),

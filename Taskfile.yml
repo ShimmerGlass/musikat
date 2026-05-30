@@ -9,6 +9,24 @@ tasks:
       CGO_ENABLED: 0
     cmd: go build .
 
+  build-all:
+     deps: [templ]
+     cmds:
+      - for:
+          matrix:
+            OS: ['windows', 'linux', 'darwin']
+            ARCH: ['amd64', 'arm64']
+
+        cmd:
+          GOOS={{ .ITEM.OS }} GOARCH={{ .ITEM.ARCH }} go build -o bin/musikat-{{ .ITEM.OS }}-{{ .ITEM.ARCH }}{{ if eq .ITEM.OS "windows" }}.exe{{ end }} .
+
   run:
     deps: [build]
     cmd: ./musikat
+
+  test:
+    deps: [templ]
+    cmds:
+      - go test -timeout 3m ./...
+      - go tool errcheck ./...
+      - go tool ineffassign ./...

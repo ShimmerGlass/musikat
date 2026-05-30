@@ -37,7 +37,7 @@ func (t *RefreshInLibrary) Run(ctx context.Context) error {
 		return err
 	}
 
-	watchedArtists, err := t.db.ListWatchedArtists(ctx)
+	watchedArtists, err := t.db.WatchedArtists(ctx)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (t *RefreshInLibrary) runArtist(ctx context.Context, sub *subsonic.User, ar
 }
 
 func (t *RefreshInLibrary) subsonic(ctx context.Context) (*subsonic.User, error) {
-	users, err := t.db.ListUsers(ctx)
+	users, err := t.db.Users(ctx)
 	if err != nil {
 		return nil, err
 	}

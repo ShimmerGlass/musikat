@@ -9,59 +9,60 @@ import (
 templ Artist(artists []database.ArtistWithStats, artist database.Artist, rgs []database.ReleaseGroup) {
 	@Layout(artist.Name, artistsMenu(artists)) {
 		<h2 class="text-3xl font-bold mb-4">{ artist.Name }</h2>
-		@artistReleases("Album", lo.Filter(rgs, func(rg database.ReleaseGroup, _ int) bool {
-			return rg.ReleaseType == "Album"
-		}))
-		@artistReleases("EP", lo.Filter(rgs, func(rg database.ReleaseGroup, _ int) bool {
-			return rg.ReleaseType == "EP"
-		}))
-		@artistReleases("Single", lo.Filter(rgs, func(rg database.ReleaseGroup, _ int) bool {
-			return rg.ReleaseType == "Single"
-		}))
+		@artistReleases("Album", rgs)
+		@artistReleases("EP", rgs)
+		@artistReleases("Single", rgs)
 	}
 }
 
 templ artistReleases(rType string, rgs []database.ReleaseGroup) {
-	<div
-		class="px-6 py-4 mb-4 transition bg-gray-50"
-	>
-		<h3 class="text-2xl font-bold mb-4">{ rType }</h3>
-		for _, rg := range rgs {
-			<div
-				class="grid grid-cols-12 items-center border-b border-gray-100 transition hover:bg-gray-50 border-gray-200 py-3 text-sm font-semibold text-gray-600"
-			>
-				<div class="col-span-4">
-					<div class="font-medium text-gray-900">
-						<a href={ templ.URL(rg.URL()) } class="underline">
-							{ rg.Name }
-						</a>
+	{{
+		subRgs := lo.Filter(rgs, func(rg database.ReleaseGroup, _ int) bool {
+			return rg.ReleaseType == rType
+		})
+	}}
+	if len(subRgs) > 0 {
+		<div
+			class="px-6 py-4 mb-4 transition bg-gray-50"
+		>
+			<h3 class="text-2xl font-bold mb-4">{ rType }</h3>
+			for _, rg := range subRgs {
+				<div
+					class="grid grid-cols-12 items-center border-b border-gray-100 transition hover:bg-gray-50 border-gray-200 py-3 text-sm font-semibold text-gray-600"
+				>
+					<div class="col-span-4">
+						<div class="font-medium text-gray-900">
+							<a href={ templ.URL(rg.URL()) } class="underline">
+								{ rg.Name }
+							</a>
+						</div>
+					</div>
+					<div class="col-span-4 text-sm text-gray-400">
+						for i, artist := range rg.Artists {
+							if i > 0 {
+								,
+							}
+							<a href={ templ.URL(artist.URL()) } class="underline text-gray-600">{ artist.Name }</a>
+						}
+					</div>
+					<div class="col-span-2 flex justify-center">
+						{ rg.ReleaseDate }
+					</div>
+					<div class="col-span-2 flex justify-center">
+						if rg.InLibrary {
+							<span class="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+								In library
+							</span>
+						} else {
+							<span class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+								Missing
+							</span>
+						}
 					</div>
 				</div>
-				<div class="col-span-4 text-sm text-gray-400">
-					for i, artist := range rg.Artists {
-						if i > 0 {
-							,
-						}
-						<a href={ templ.URL(artist.URL()) } class="underline text-gray-600">{ artist.Name }</a>
-					}
-				</div>
-				<div class="col-span-2 flex justify-center">
-					{ rg.ReleaseDate }
-				</div>
-				<div class="col-span-2 flex justify-center">
-					if rg.InLibrary {
-						<span class="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-							In library
-						</span>
-					} else {
-						<span class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-							Missing
-						</span>
-					}
-				</div>
-			</div>
-		}
-	</div>
+			}
+		</div>
+	}
 }
 
 templ artistsMenu(artists []database.ArtistWithStats) {

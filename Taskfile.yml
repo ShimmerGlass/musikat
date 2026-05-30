@@ -7,7 +7,7 @@ tasks:
     deps: [templ]
     env:
       CGO_ENABLED: 0
-    cmd: go build .
+    cmd: go build -ldflags "-X github.com/shimmerglass/musikat/version.Version=${VERSION:-dev}" .
 
   build-all:
      deps: [templ]
@@ -17,8 +17,12 @@ tasks:
             OS: ['windows', 'linux', 'darwin']
             ARCH: ['amd64', 'arm64']
 
-        cmd:
-          GOOS={{ .ITEM.OS }} GOARCH={{ .ITEM.ARCH }} go build -o bin/musikat-{{ .ITEM.OS }}-{{ .ITEM.ARCH }}{{ if eq .ITEM.OS "windows" }}.exe{{ end }} .
+        cmd: |
+          GOOS={{ .ITEM.OS }} GOARCH={{ .ITEM.ARCH }} \
+          go build \
+          -ldflags "-X github.com/shimmerglass/musikat/version.Version=${VERSION:-dev}" \
+          -o bin/musikat-{{ .ITEM.OS }}-{{ .ITEM.ARCH }}{{ if eq .ITEM.OS "windows" }}.exe{{ end }} \
+          .
 
   run:
     deps: [build]

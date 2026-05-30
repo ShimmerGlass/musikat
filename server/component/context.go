@@ -9,8 +9,9 @@ import (
 type ctxKey string
 
 const (
-	ctxKeyUser ctxKey = "user"
-	ctxKeyURL  ctxKey = "url"
+	ctxKeyUser           ctxKey = "user"
+	ctxKeyURL            ctxKey = "url"
+	ctxKeyRefreshRunning ctxKey = "refresh_running"
 )
 
 func CtxWithUser(ctx context.Context, user database.User) context.Context {
@@ -27,4 +28,12 @@ func CtxWithURL(ctx context.Context, url string) context.Context {
 
 func URLFromCtx(ctx context.Context) string {
 	return ctx.Value(ctxKeyURL).(string)
+}
+
+func CtxWithRefreshRunning(ctx context.Context, running bool) context.Context {
+	return context.WithValue(ctx, ctxKeyRefreshRunning, running)
+}
+
+func RefreshRunningFromCtx(ctx context.Context) bool {
+	return ctx.Value(ctxKeyRefreshRunning).(bool)
 }

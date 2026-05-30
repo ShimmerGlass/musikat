@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -22,6 +23,9 @@ type Tasks struct {
 	cfg Config
 
 	tasks []task
+
+	refresh chan struct{}
+	running atomic.Bool
 }
 
 func New(
@@ -32,7 +36,8 @@ func New(
 	notifier notification.Notifier,
 ) *Tasks {
 	return &Tasks{
-		cfg: cfg,
+		cfg:     cfg,
+		refresh: make(chan struct{}),
 		tasks: []task{
 			NewRefreshStarred(db, sub),
 			NewRefreshArtistReleases(db, mbz),
@@ -43,13 +48,23 @@ func New(
 }
 
 func (t *Tasks) Start() {
-	if !t.cfg.Enabled {
-		return
-	}
-
 	go func() {
-		tick := time.Tick(t.cfg.Interval)
-		for ; ; <-tick {
+		var tick <-chan time.Time
+		var start chan struct{}
+
+		if t.cfg.Enabled {
+			tick = time.Tick(t.cfg.Interval)
+			start = make(chan struct{}, 1)
+			start <- struct{}{}
+		}
+
+		for {
+			select {
+			case <-tick:
+			case <-start:
+			case <-t.refresh:
+			}
+
 			err := t.Run(context.Background())
 			if err != nil {
 				slog.Error(err.Error())
@@ -59,6 +74,9 @@ func (t *Tasks) Start() {
 }
 
 func (t *Tasks) Run(ctx context.Context) error {
+	t.running.Store(true)
+	defer t.running.Store(false)
+
 	slog.Info("refresh started")
 
 	for _, task := range t.tasks {
@@ -77,6 +95,17 @@ func (t *Tasks) Run(ctx context.Context) error {
 	slog.Info("refresh completed")
 
 	return nil
+}
+
+func (t *Tasks) Running() bool {
+	return t.running.Load()
+}
+
+func (t *Tasks) Refresh() {
+	select {
+	case t.refresh <- struct{}{}:
+	default:
+	}
 }
 
 func (t *Tasks) taskName(to task) string {

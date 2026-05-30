@@ -47,7 +47,7 @@ func run() error {
 	tasks := task.New(cfg.Refresh, db, mbz, sub, notif)
 	tasks.Start()
 
-	srv := server.New(cfg.Server, db)
+	srv := server.New(cfg.Server, db, tasks)
 
 	return srv.Run()
 }

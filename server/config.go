@@ -1,6 +1,6 @@
 package server
 
 type Config struct {
-	ListenAddr string `yaml:"listen_addr"`
-	JWTKey     string `yaml:"jwt_key"`
+	ListenAddr string `env:"LISTEN_ADDR, default=:8080"`
+	JWTKey     string `env:"JWT_KEY"`
 }

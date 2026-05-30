@@ -2,7 +2,7 @@
 
 /bin
 
-/config.yaml
+/.env
 /musikat
 /musikat.db
 

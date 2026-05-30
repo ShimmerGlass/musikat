@@ -1,33 +1,31 @@
 package main
 
 import (
-	"os"
+	"context"
 
+	"github.com/sethvargo/go-envconfig"
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/notification"
 	"github.com/shimmerglass/musikat/server"
 	"github.com/shimmerglass/musikat/subsonic"
-	"go.yaml.in/yaml/v3"
 )
 
 type Config struct {
-	DB       database.Config         `yaml:"db"`
-	Subsonic subsonic.Config         `yaml:"subsonic"`
-	Server   server.Config           `yaml:"server"`
-	XMPP     notification.XMPPConfig `yaml:"xmpp"`
+	DB       database.Config         `env:", prefix=DB_"`
+	Subsonic subsonic.Config         `env:", prefix=SUBSONIC_"`
+	Server   server.Config           `env:", prefix=SERVER_"`
+	XMPP     notification.XMPPConfig `env:", prefix=XMPP_"`
 }
 
-func readConfig(path string) (Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Config{}, err
-	}
-
+func readConfig() (Config, error) {
 	var cfg Config
 
-	err = yaml.Unmarshal(data, &cfg)
+	err := envconfig.ProcessWith(context.Background(), &envconfig.Config{
+		Target:   &cfg,
+		Lookuper: envconfig.PrefixLookuper("MUSIKAT_", envconfig.OsLookuper()),
+	})
 	if err != nil {
-		return Config{}, err
+		return cfg, err
 	}
 
 	return cfg, nil

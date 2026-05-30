@@ -12,10 +12,13 @@ import (
 )
 
 type XMPPConfig struct {
-	Host     string `yaml:"host"`
-	JID      string `yaml:"jid"`
-	Password string `yaml:"password"`
+	Enabled  bool   `env:"ENABLED"`
+	Host     string `env:"HOST"`
+	JID      string `env:"JID"`
+	Password string `env:"PASSWORD"`
 }
+
+var _ Notifier = (*XMPP)(nil)
 
 type XMPP struct {
 	client *xmpp.Client

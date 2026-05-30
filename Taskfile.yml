@@ -22,6 +22,8 @@ tasks:
 
   run:
     deps: [build]
+    dotenv:
+      - .env
     cmd: ./musikat
 
   test:

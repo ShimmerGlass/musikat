@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
@@ -22,10 +21,7 @@ func main() {
 }
 
 func run() error {
-	cfgPath := flag.String("c", "config.yaml", "Config file")
-	flag.Parse()
-
-	cfg, err := readConfig(*cfgPath)
+	cfg, err := readConfig()
 	if err != nil {
 		return err
 	}
@@ -37,12 +33,18 @@ func run() error {
 
 	sub := subsonic.New(cfg.Subsonic)
 	mbz := musicbrainz.New()
-	xmpp, err := notification.NewXMPP(cfg.XMPP)
-	if err != nil {
-		return err
+
+	var notif notification.Notifier
+	if cfg.XMPP.Enabled {
+		notif, err = notification.NewXMPP(cfg.XMPP)
+		if err != nil {
+			return err
+		}
+	} else {
+		notif = &notification.Noop{}
 	}
 
-	tasks := task.New(db, mbz, sub, xmpp)
+	tasks := task.New(db, mbz, sub, notif)
 	tasks.Start()
 
 	srv := server.New(cfg.Server, db)

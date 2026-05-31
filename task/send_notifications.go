@@ -65,7 +65,7 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 				continue
 			}
 
-			message := fmt.Sprintf("New release from %s!\n%s\n%s", artist.Name, rg.Name, rg.URL())
+			message := fmt.Sprintf("New release from %s!\n%s\n%s", artist.Name, rg.Name, rg.MBzURL())
 			err = t.notifier.Send(ctx, user, message)
 			if err != nil {
 				return err

@@ -45,6 +45,8 @@ func (s *Server) Run() error {
 	http.Handle("POST /admin/users/create", s.handle(s.authHandler(s.userCreateHandler)))
 
 	http.Handle("GET /artists/{mbid}", s.handle(s.authHandler(s.artist)))
+	http.Handle("GET /artists/{mbid}/watch", s.handle(s.authHandler(s.artistWatch)))
+	http.Handle("GET /artists/{mbid}/stop-watch", s.handle(s.authHandler(s.artistStopWatch)))
 
 	slog.Info("listening", "addr", s.cfg.ListenAddr)
 	return http.ListenAndServe(s.cfg.ListenAddr, nil)

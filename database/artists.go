@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"path"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/samber/lo"
@@ -19,8 +20,12 @@ type Artist struct {
 	Name  string `db:"name"`
 }
 
-func (a Artist) URL() string {
+func (a Artist) MBzURL() string {
 	return fmt.Sprintf("https://musicbrainz.org/artist/%s", a.MBzID)
+}
+
+func (a Artist) UIPath() string {
+	return path.Join("/artists", a.MBzID)
 }
 
 type ArtistWithStats struct {

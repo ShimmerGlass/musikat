@@ -61,6 +61,14 @@ func (t *RefreshStarred) runUser(ctx context.Context, user database.User) error 
 			return err
 		}
 
+		_, ok, err := t.db.ArtistWatch(ctx, user.ID, starred.MBzID)
+		if err != nil {
+			return err
+		}
+		if ok {
+			continue
+		}
+
 		err = t.db.AddArtistWatch(ctx, database.ArtistWatch{
 			UserID:      user.ID,
 			ArtistMBzID: starred.MBzID,

@@ -22,7 +22,7 @@ type ReleaseGroup struct {
 	Artists []Artist `db:"-" yaml:"artists"`
 }
 
-func (r ReleaseGroup) URL() string {
+func (r ReleaseGroup) MBzURL() string {
 	return fmt.Sprintf("https://musicbrainz.org/release-group/%s", r.MBzID)
 }
 

@@ -138,22 +138,49 @@ templ artistReleases(rType string, rgs []database.ReleaseGroup) {
 }
 
 templ artistsMenu(artists []database.ArtistWithStats) {
+	<input
+		id="artist-search"
+		type="text"
+		placeholder="Search artists..."
+		class="mb-2 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+	/>
 	for _, artist := range artists {
-		@menuItem(artist.Name, fmt.Sprintf("/artists/%s", artist.MBzID)) {
-			<div
-				class="relative flex items-center overflow-hidden rounded-full text-xs font-semibold"
-				title="Found / Missing"
-			>
+		<div class="artist-item" data-name={ artist.Name }>
+			@menuItem(artist.Name, fmt.Sprintf("/artists/%s", artist.MBzID)) {
 				<div
-					class="absolute inset-0 bg-[linear-gradient(100deg,rgba(34,197,94,0.2)_50%,rgba(239,68,68,0.2)_50%)]"
-				></div>
-				<span class="relative px-3 py-1 text-green-400">
-					{ artist.InLibrary }
-				</span>
-				<span class="relative px-3 py-1 text-red-400">
-					{ artist.Missing }
-				</span>
-			</div>
-		}
+					class="relative flex items-center overflow-hidden rounded-full text-xs font-semibold"
+					title="Found / Missing"
+				>
+					<div
+						class="absolute inset-0 bg-[linear-gradient(100deg,rgba(34,197,94,0.2)_50%,rgba(239,68,68,0.2)_50%)]"
+					></div>
+					<span class="relative px-3 py-1 text-green-400">
+						{ artist.InLibrary }
+					</span>
+					<span class="relative px-3 py-1 text-red-400">
+						{ artist.Missing }
+					</span>
+				</div>
+			}
+		</div>
 	}
+	<script>
+		function normalizeText(text) {
+			return text
+				.toLowerCase()
+				.normalize("NFD")
+				.replace(/[\u0300-\u036f]/g, "");
+		}
+
+		document
+			.getElementById("artist-search")
+			.addEventListener("input", function () {
+				const query = normalizeText(this.value);
+
+				document.querySelectorAll(".artist-item").forEach((item) => {
+					const name = normalizeText(item.dataset.name);
+					item.style.display = name.includes(query) ? "" : "none";
+				});
+			});
+	</script>
 }

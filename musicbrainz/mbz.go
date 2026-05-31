@@ -31,16 +31,28 @@ func New() *MusicBrainz {
 }
 
 func (m *MusicBrainz) ArtistReleaseGroups(ctx context.Context, artistMBzID string) ([]database.ReleaseGroup, error) {
-	<-m.tick
-	mbRes, err := m.client.BrowseReleaseGroups(ctx, mbz.ReleaseGroupFilter{
-		ArtistMBID: mbtypes.MBID(artistMBzID),
-		Includes:   []string{"artist-credits"},
-	}, mbz.DefaultPaginator())
-	if err != nil {
-		return nil, fmt.Errorf("mbz artist release groups: %w", err)
+	rgs := []mbz.ReleaseGroup{}
+	paginator := paginator()
+
+	for {
+		<-m.tick
+		mbRes, err := m.client.BrowseReleaseGroups(ctx, mbz.ReleaseGroupFilter{
+			ArtistMBID: mbtypes.MBID(artistMBzID),
+			Includes:   []string{"artist-credits"},
+		}, paginator)
+		if err != nil {
+			return nil, fmt.Errorf("mbz artist release groups: %w", err)
+		}
+
+		rgs = append(rgs, mbRes.ReleaseGroups...)
+		if len(rgs) >= mbRes.Count {
+			break
+		}
+
+		paginator.Offset += len(mbRes.ReleaseGroups)
 	}
 
-	return lo.FilterMap(mbRes.ReleaseGroups, func(rg mbz.ReleaseGroup, _ int) (database.ReleaseGroup, bool) {
+	return lo.FilterMap(rgs, func(rg mbz.ReleaseGroup, _ int) (database.ReleaseGroup, bool) {
 		if slices.Contains(rg.SecondaryTypes, "Compilation") {
 			return database.ReleaseGroup{}, false
 		}
@@ -62,15 +74,34 @@ func (m *MusicBrainz) ArtistReleaseGroups(ctx context.Context, artistMBzID strin
 }
 
 func (m *MusicBrainz) ReleaseGroupsReleases(ctx context.Context, releaseGroupMBzID string) ([]string, error) {
-	<-m.tick
-	mbRes, err := m.client.BrowseReleases(ctx, mbz.ReleaseFilter{
-		ReleaseGroupMBID: mbtypes.MBID(releaseGroupMBzID),
-	}, mbz.DefaultPaginator())
-	if err != nil {
-		return nil, err
+	releases := []mbz.Release{}
+	paginator := paginator()
+
+	for {
+		<-m.tick
+		mbRes, err := m.client.BrowseReleases(ctx, mbz.ReleaseFilter{
+			ReleaseGroupMBID: mbtypes.MBID(releaseGroupMBzID),
+		}, paginator)
+		if err != nil {
+			return nil, err
+		}
+
+		releases = append(releases, mbRes.Releases...)
+		if len(releases) >= mbRes.Count {
+			break
+		}
+
+		paginator.Offset += len(mbRes.Releases)
 	}
 
-	return lo.Map(mbRes.Releases, func(rel mbz.Release, _ int) string {
+	return lo.Map(releases, func(rel mbz.Release, _ int) string {
 		return string(rel.ID)
 	}), nil
+}
+
+func paginator() mbz.Paginator {
+	return mbz.Paginator{
+		Offset: 0,
+		Limit:  mbz.MaxLimit,
+	}
 }

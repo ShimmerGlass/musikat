@@ -140,17 +140,17 @@ templ artistReleases(rType string, rgs []database.ReleaseGroup) {
 templ artistsMenu(artists []database.ArtistWithStats) {
 	for _, artist := range artists {
 		@menuItem(artist.Name, fmt.Sprintf("/artists/%s", artist.MBzID)) {
-			<div class="flex items-center gap-2 text-xs font-semibold">
-				<span
-					class="rounded-full bg-green-500/20 px-2 py-1 text-green-400"
-					title="Found"
-				>
+			<div
+				class="relative flex items-center overflow-hidden rounded-full text-xs font-semibold"
+				title="Found / Missing"
+			>
+				<div
+					class="absolute inset-0 bg-[linear-gradient(100deg,rgba(34,197,94,0.2)_50%,rgba(239,68,68,0.2)_50%)]"
+				></div>
+				<span class="relative px-3 py-1 text-green-400">
 					{ artist.InLibrary }
 				</span>
-				<span
-					class="rounded-full bg-red-500/20 px-2 py-1 text-red-400"
-					title="Missing"
-				>
+				<span class="relative px-3 py-1 text-red-400">
 					{ artist.Missing }
 				</span>
 			</div>

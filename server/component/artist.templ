@@ -9,7 +9,12 @@ import (
 templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch database.ArtistWatch, rgs []database.ReleaseGroup) {
 	@Layout(artist.Name, artistsMenu(artists)) {
 		<h2 class="flex text-3xl font-bold mb-4">
-			<div class="flex-1">{ artist.Name }</div>
+			<div class="flex-1">
+				{ artist.Name }
+				<a href={ artist.MBzURL() }>
+					@IconMusicBrains()
+				</a>
+			</div>
 			<div class="relative inline-block text-left">
 				<!-- Dropdown Button -->
 				<button

@@ -5,13 +5,16 @@ import (
 	"database/sql"
 	"embed"
 	_ "embed"
-	"io/fs"
-	"log/slog"
-	"path/filepath"
+	"errors"
+	"fmt"
+
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
-//go:embed sql
-var migs embed.FS
+//go:embed sql/*.sql
+var fs embed.FS
 
 type Migrations struct {
 	db *sql.DB
@@ -22,22 +25,29 @@ func New(db *sql.DB) *Migrations {
 }
 
 func (m *Migrations) Exec(ctx context.Context) error {
-	entries, err := fs.ReadDir(migs, "sql")
+	d, err := iofs.New(fs, "sql")
 	if err != nil {
-		return err
+		return fmt.Errorf("migrations: source: %w", err)
 	}
 
-	for _, entry := range entries {
-		contents, err := fs.ReadFile(migs, filepath.Join("sql", entry.Name()))
-		if err != nil {
-			return err
-		}
+	dbInst, err := sqlite.WithInstance(m.db, &sqlite.Config{
+		MigrationsTable: "migrations",
+	})
+	if err != nil {
+		return fmt.Errorf("migrations: db: %w", err)
+	}
 
-		slog.Info("applying", "migration", entry.Name())
-		_, err = m.db.Exec(string(contents))
-		if err != nil {
-			return err
-		}
+	mig, err := migrate.NewWithInstance("iofs", d, "sqlite", dbInst)
+	if err != nil {
+		return fmt.Errorf("migrations: new: %w", err)
+	}
+
+	err = mig.Up()
+	if errors.Is(err, migrate.ErrNoChange) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("migrations: up: %w", err)
 	}
 
 	return nil

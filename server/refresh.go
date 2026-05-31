@@ -8,10 +8,21 @@ import (
 )
 
 func (s *Server) refresh(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
-	s.tasks.Refresh()
+	query := r.URL.Query()
+
+	if artistID := query.Get("artist"); artistID != "" {
+		artist, err := s.db.Artist(ctx, artistID)
+		if err != nil {
+			return err
+		}
+
+		s.tasks.RefreshArtist(artist)
+	} else {
+		s.tasks.Refresh()
+	}
 
 	redirect := "/"
-	if next := r.URL.Query().Get("next"); next != "" {
+	if next := query.Get("next"); next != "" {
 		redirect = next
 	}
 

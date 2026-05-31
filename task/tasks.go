@@ -19,13 +19,18 @@ type task interface {
 	Run(context.Context) error
 }
 
+type artistTask interface {
+	RunArtist(context.Context, database.Artist) error
+}
+
 type Tasks struct {
 	cfg Config
 
 	tasks []task
 
-	refresh chan struct{}
-	running atomic.Bool
+	refresh       chan struct{}
+	refreshArtist chan database.Artist
+	running       atomic.Bool
 }
 
 func New(
@@ -36,8 +41,9 @@ func New(
 	notifier notification.Notifier,
 ) *Tasks {
 	return &Tasks{
-		cfg:     cfg,
-		refresh: make(chan struct{}),
+		cfg:           cfg,
+		refresh:       make(chan struct{}),
+		refreshArtist: make(chan database.Artist),
 		tasks: []task{
 			NewRefreshStarred(db, sub),
 			NewRefreshArtistReleases(db, mbz),
@@ -63,6 +69,14 @@ func (t *Tasks) Start() {
 			case <-tick:
 			case <-start:
 			case <-t.refresh:
+
+			case artist := <-t.refreshArtist:
+				err := t.RunArtist(context.Background(), artist)
+				if err != nil {
+					slog.Error(err.Error())
+				}
+
+				continue
 			}
 
 			err := t.Run(context.Background())
@@ -97,6 +111,37 @@ func (t *Tasks) Run(ctx context.Context) error {
 	return nil
 }
 
+func (t *Tasks) RunArtist(ctx context.Context, artist database.Artist) error {
+	t.running.Store(true)
+	defer t.running.Store(false)
+
+	slog.Info("refresh started", "artist", artist.Name)
+
+	for _, task := range t.tasks {
+		name := t.taskName(task)
+
+		slog.Info("task started", "task", name)
+
+		if at, ok := task.(artistTask); ok {
+			err := at.RunArtist(ctx, artist)
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
+		} else {
+			err := task.Run(ctx)
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
+		}
+
+		slog.Info("task finished", "task", name)
+	}
+
+	slog.Info("refresh completed", "artist", artist.Name)
+
+	return nil
+}
+
 func (t *Tasks) Running() bool {
 	return t.running.Load()
 }
@@ -106,6 +151,10 @@ func (t *Tasks) Refresh() {
 	case t.refresh <- struct{}{}:
 	default:
 	}
+}
+
+func (t *Tasks) RefreshArtist(artist database.Artist) {
+	t.refreshArtist <- artist
 }
 
 func (t *Tasks) taskName(to task) string {

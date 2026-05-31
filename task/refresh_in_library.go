@@ -33,18 +33,13 @@ func NewRefreshInLibrary(
 func (t *RefreshInLibrary) Run(ctx context.Context) error {
 	slog.Info("refreshing in-library releases")
 
-	sub, err := t.subsonic(ctx)
-	if err != nil {
-		return err
-	}
-
 	watchedArtists, err := t.db.WatchedArtists(ctx)
 	if err != nil {
 		return err
 	}
 
 	for _, artist := range watchedArtists {
-		err := t.runArtist(ctx, sub, artist)
+		err := t.RunArtist(ctx, artist)
 		if err != nil {
 			return err
 		}
@@ -53,8 +48,13 @@ func (t *RefreshInLibrary) Run(ctx context.Context) error {
 	return nil
 }
 
-func (t *RefreshInLibrary) runArtist(ctx context.Context, sub *subsonic.User, artist database.Artist) error {
+func (t *RefreshInLibrary) RunArtist(ctx context.Context, artist database.Artist) error {
 	slog.Info("refreshing artist in-library releases", "artist", artist.Name)
+
+	sub, err := t.subsonic(ctx)
+	if err != nil {
+		return err
+	}
 
 	rgs, err := t.db.ArtistReleaseGroups(ctx, artist)
 	if err != nil {

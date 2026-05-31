@@ -45,6 +45,7 @@ func New(
 		refresh:       make(chan struct{}),
 		refreshArtist: make(chan database.Artist),
 		tasks: []task{
+			NewRefreshArtists(db, sub),
 			NewRefreshStarred(db, sub),
 			NewRefreshArtistReleases(db, mbz),
 			NewRefreshInLibrary(db, mbz, sub),

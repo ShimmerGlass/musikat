@@ -9,10 +9,20 @@ import (
 )
 
 func (s *Server) index(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
-	artists, err := s.db.UserWatchedArtistsWithStats(ctx, user)
+	watchedArtists, err := s.db.UserWatchedArtistsWithStats(ctx, user)
 	if err != nil {
 		return err
 	}
 
-	return component.Index(artists).Render(ctx, rw)
+	stats, err := s.db.Stats(ctx)
+	if err != nil {
+		return err
+	}
+
+	artists, err := s.db.Artists(ctx)
+	if err != nil {
+		return err
+	}
+
+	return component.Index(watchedArtists, artists, stats).Render(ctx, rw)
 }

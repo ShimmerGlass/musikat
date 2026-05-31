@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/delucks/go-subsonic"
+	"github.com/samber/lo"
 	"github.com/shimmerglass/musikat/database"
 )
 
@@ -72,4 +73,17 @@ func (s *User) artist(ctx context.Context, in *subsonic.ArtistID3) (database.Art
 		Name:  in.Name,
 		MBzID: info.MusicBrainzID,
 	}, nil
+}
+
+func (s *User) Artists(ctx context.Context) ([]database.Artist, error) {
+	artists, err := s.client.GetArtists(map[string]string{})
+	if err != nil {
+		return nil, err
+	}
+
+	return lo.FlatMapErr(artists.Index, func(index *subsonic.IndexID3, _ int) ([]database.Artist, error) {
+		return lo.MapErr(index.Artist, func(artist *subsonic.ArtistID3, _ int) (database.Artist, error) {
+			return s.artist(ctx, artist)
+		})
+	})
 }

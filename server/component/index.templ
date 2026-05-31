@@ -2,6 +2,136 @@ package component
 
 import "github.com/shimmerglass/musikat/database"
 
-templ Index(artists []database.ArtistWithStats) {
-	@Layout("Home", artistsMenu(artists))
+templ Index(artists []database.ArtistWithStats, allArtists []database.Artist, stats database.Stats) {
+	@Layout("Home", artistsMenu(artists)) {
+		<div class="flex flex-col justify-around h-3/5">
+			<form class="flex justify-center" id="add-form">
+				<div class="flex w-3/5">
+					<div class="relative w-4/5">
+						<input
+							id="search"
+							type="text"
+							placeholder="Watch a new artist..."
+							autocomplete="off"
+							class="w-full rounded-l-2xl border border-slate-700 bg-white px-5 py-4 text-lg text-gray-900 shadow-lg outline-none transition focus:border-blue-500"
+						/>
+						<div
+							id="suggestions"
+							class="absolute z-50 mt-2 hidden max-h-80 w-full overflow-y-auto rounded-2xl border border-slate-700 bg-gray-900 shadow-xl"
+						></div>
+					</div>
+					<button type="submit" id="add-button" disabled class="inline-flex items-center gap-2 rounded-r-2xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50">Add</button>
+				</div>
+			</form>
+			<div>
+				<h2 class="text-3xl font-bold text-center mb-4">Stats</h2>
+				<div class="grid gap-6 md:grid-cols-3 text-center">
+					<div class="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-6">
+						<div class="absolute inset-x-0 top-0 h-1 bg-emerald-500"></div>
+						<div class="text-sm font-medium text-slate-400">
+							Artists
+						</div>
+						<div class="mt-3 text-4xl font-bold text-white">
+							{ stats.Artists }
+						</div>
+					</div>
+					<div class="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-6">
+						<div class="absolute inset-x-0 top-0 h-1 bg-blue-500"></div>
+						<div class="text-sm font-medium text-slate-400">
+							Release Groups
+						</div>
+						<div class="mt-3 text-4xl font-bold text-white">
+							{ stats.ReleaseGroups }
+						</div>
+					</div>
+					<div class="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-6">
+						<div class="absolute inset-x-0 top-0 h-1 bg-amber-500"></div>
+						<div class="text-sm font-medium text-slate-400">
+							Watches
+						</div>
+						<div class="mt-3 text-4xl font-bold text-white">
+							{ stats.Watches }
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		@templ.JSONScript("artists", allArtists)
+		<script>
+			const values = JSON.parse(document.getElementById('artists').textContent);
+
+			const searchInput = document.getElementById("search");
+			const addForm = document.getElementById("add-form");
+			const addButton = document.getElementById("add-button");
+			const suggestions = document.getElementById("suggestions");
+
+			function escapeHtmlAttr(value) {
+				return String(value)
+					.replace(/&/g, "&amp;")
+					.replace(/"/g, "&quot;")
+					.replace(/'/g, "&#39;")
+					.replace(/</g, "&lt;")
+					.replace(/>/g, "&gt;");
+			}
+
+			function normalize(text) {
+				return text
+					.toLowerCase()
+					.normalize("NFD")
+					.replace(/[\u0300-\u036f]/g, "");
+			}
+
+			searchInput.addEventListener("input", () => {
+				addButton.disabled = true
+				const query = normalize(searchInput.value.trim());
+
+				if (!query) {
+					suggestions.classList.add("hidden");
+					return;
+				}
+
+				const matches = values
+					.filter((value) => normalize(value.Name).includes(query))
+					.slice(0, 10);
+
+				if (matches.length === 0) {
+					suggestions.classList.add("hidden");
+					return;
+				}
+
+				suggestions.innerHTML = matches
+					.map(
+						(value) => `
+						<button
+							type="button"
+							class="block w-full px-4 py-3 text-left text-white hover:bg-slate-800"
+							data-value="${escapeHtmlAttr(JSON.stringify(value))}"
+						>
+							${value.Name}
+						</button>
+					`
+					)
+					.join("");
+
+				suggestions.classList.remove("hidden");
+			});
+
+			suggestions.addEventListener("click", (e) => {
+				const button = e.target.closest("[data-value]");
+				if (!button) return;
+
+				const selected = JSON.parse(button.dataset.value);
+				searchInput.value = selected.Name;
+				suggestions.classList.add("hidden");
+				addForm.action = `/artists/${selected.MBzID}/watch`;
+				addButton.disabled = false;
+			});
+
+			document.addEventListener("click", (e) => {
+				if (!e.target.closest(".relative")) {
+					suggestions.classList.add("hidden");
+				}
+			});
+		</script>
+	}
 }

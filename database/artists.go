@@ -70,6 +70,20 @@ func (d *DB) Artist(ctx context.Context, mbzID string) (Artist, error) {
 	return artist, nil
 }
 
+func (d *DB) Artists(ctx context.Context) ([]Artist, error) {
+	res := []Artist{}
+
+	err := d.gq.
+		Select("*").
+		From(tableArtists).
+		Executor().ScanStructsContext(ctx, &res)
+	if err != nil {
+		return nil, fmt.Errorf("list artists: %w", err)
+	}
+
+	return res, nil
+}
+
 func (d *DB) WatchedArtists(ctx context.Context) ([]Artist, error) {
 	scanner, err := d.gq.
 		Select(fmt.Sprintf("%s.*", tableArtists)).
@@ -110,6 +124,7 @@ func (d *DB) UserWatchedArtists(ctx context.Context, user User) ([]Artist, error
 		Join(goqu.T(tableArtistWatches), goqu.On(goqu.I("artist_mb_id").Eq(goqu.I("mb_id")))).
 		Where(goqu.Ex{
 			"user_id": user.ID,
+			"status":  1,
 		}).
 		Executor().ScannerContext(ctx)
 	if err != nil {

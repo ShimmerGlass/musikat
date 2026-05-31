@@ -34,7 +34,7 @@ func (d *DB) HasReleaseGroupNotification(ctx context.Context, rgID, userID strin
 			goqu.C("user_id").Eq(userID),
 			goqu.C("release_group_mb_id").Eq(rgID),
 		).
-		Executor().ScanVal(&count)
+		Executor().ScanValContext(ctx, &count)
 	if err != nil {
 		return false, fmt.Errorf("has release group notification: %w", err)
 	}

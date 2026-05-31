@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 
 	"github.com/samber/lo"
 	"github.com/shimmerglass/musikat/database"
@@ -66,6 +67,10 @@ func (t *RefreshInLibrary) runArtist(ctx context.Context, sub *subsonic.User, ar
 	}
 
 	for _, releaseGroup := range rgs {
+		if releaseGroup.InLibraryReleaseMBzID != "" && slices.Contains(inLibReleases, releaseGroup.InLibraryReleaseMBzID) {
+			continue
+		}
+
 		slog.Info("refreshing artist release group in-library releases", "artist", artist.Name, "release_group", releaseGroup.Name)
 
 		allReleaseIDs, err := t.mbz.ReleaseGroupsReleases(ctx, releaseGroup.MBzID)
@@ -73,8 +78,11 @@ func (t *RefreshInLibrary) runArtist(ctx context.Context, sub *subsonic.User, ar
 			return err
 		}
 
-		inLib := len(lo.Intersect(inLibReleases, allReleaseIDs)) > 0
-		releaseGroup.InLibrary = inLib
+		inLib := lo.Intersect(inLibReleases, allReleaseIDs)
+		releaseGroup.InLibrary = len(inLib) > 0
+		if len(inLib) > 0 {
+			releaseGroup.InLibraryReleaseMBzID = inLib[0]
+		}
 
 		err = t.db.AddReleaseGroup(ctx, releaseGroup)
 		if err != nil {

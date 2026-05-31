@@ -13,11 +13,12 @@ const (
 )
 
 type ReleaseGroup struct {
-	MBzID       string `db:"mb_id" yaml:"m_bz_id"`
-	Name        string `db:"name" yaml:"name"`
-	ReleaseType string `db:"release_type"`
-	ReleaseDate string `db:"release_date"`
-	InLibrary   bool   `db:"in_library" yaml:"in_library"`
+	MBzID                 string `db:"mb_id"`
+	Name                  string `db:"name"`
+	ReleaseType           string `db:"release_type"`
+	ReleaseDate           string `db:"release_date"`
+	InLibrary             bool   `db:"in_library"`
+	InLibraryReleaseMBzID string `db:"in_library_release_mb_id"`
 
 	Artists []Artist `db:"-" yaml:"artists"`
 }
@@ -30,8 +31,9 @@ func (d *DB) AddReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
 	_, err := d.gq.Insert(tableReleaseGroups).
 		Rows(rg).
 		OnConflict(goqu.DoUpdate("mb_id", goqu.Record{
-			"name":       goqu.L("excluded.name"),
-			"in_library": goqu.L("excluded.in_library"),
+			"name":                     goqu.L("excluded.name"),
+			"in_library":               goqu.L("excluded.in_library"),
+			"in_library_release_mb_id": goqu.L("excluded.in_library_release_mb_id"),
 		})).
 		Executor().ExecContext(ctx)
 	if err != nil {

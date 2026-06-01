@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/samber/lo"
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/subsonic"
 )
@@ -55,7 +56,19 @@ func (t *RefreshStarred) runUser(ctx context.Context, user database.User) error 
 		return err
 	}
 
+	existing, err := t.db.UserWatchedArtists(ctx, user)
+	if err != nil {
+		return err
+	}
+	existingIDs := lo.SliceToMap(existing, func(artist database.Artist) (string, bool) {
+		return artist.MBzID, true
+	})
+
 	for _, starred := range starred {
+		if existingIDs[starred.MBzID] {
+			continue
+		}
+
 		err := t.db.AddArtist(ctx, starred)
 		if err != nil {
 			return err
@@ -73,6 +86,7 @@ func (t *RefreshStarred) runUser(ctx context.Context, user database.User) error 
 			UserID:      user.ID,
 			ArtistMBzID: starred.MBzID,
 			Source:      "subsonic",
+			Status:      true,
 		})
 		if err != nil {
 			return err

@@ -89,6 +89,9 @@ func (d *DB) WatchedArtists(ctx context.Context) ([]Artist, error) {
 		Select(fmt.Sprintf("%s.*", tableArtists)).
 		From(tableArtists).
 		Join(goqu.T(tableArtistWatches), goqu.On(goqu.I("artist_mb_id").Eq(goqu.I("mb_id")))).
+		Where(goqu.Ex{
+			"status": 1,
+		}).
 		Executor().ScannerContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list watched artists: select: %w", err)

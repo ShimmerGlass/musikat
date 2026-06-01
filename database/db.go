@@ -16,7 +16,7 @@ type DB struct {
 }
 
 func New(cfg Config) (*DB, error) {
-	db, err := sql.Open("sqlite", cfg.Path)
+	db, err := sql.Open("sqlite", cfg.Path+"?_time_integer_format=unix")
 	if err != nil {
 		return nil, err
 	}

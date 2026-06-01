@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/notification"
@@ -40,12 +41,17 @@ func (t *SendNotifications) Run(ctx context.Context) error {
 }
 
 func (t *SendNotifications) runUser(ctx context.Context, user database.User) error {
-	artists, err := t.db.UserWatchedArtists(ctx, user)
+	watches, err := t.db.UserArtistWatches(ctx, user)
 	if err != nil {
 		return err
 	}
 
-	for _, artist := range artists {
+	for _, watch := range watches {
+		artist, err := t.db.Artist(ctx, watch.ArtistMBzID)
+		if err != nil {
+			return err
+		}
+
 		rgs, err := t.db.ArtistReleaseGroups(ctx, artist)
 		if err != nil {
 			return err
@@ -53,6 +59,10 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 
 		for _, rg := range rgs {
 			if rg.InLibrary {
+				continue
+			}
+
+			if rg.ReleaseTime().Before(time.Unix(watch.AddedAt, 0)) {
 				continue
 			}
 

@@ -3,6 +3,9 @@ package database
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 )
@@ -25,6 +28,32 @@ type ReleaseGroup struct {
 
 func (r ReleaseGroup) MBzURL() string {
 	return fmt.Sprintf("https://musicbrainz.org/release-group/%s", r.MBzID)
+}
+
+func (r ReleaseGroup) ReleaseTime() time.Time {
+	year := 0
+	month := time.January
+	day := 1
+
+	parts := strings.Split(r.ReleaseDate, "-")
+
+	if len(parts) > 0 {
+		year, _ = strconv.Atoi(parts[0])
+	}
+	if len(parts) > 1 {
+		m, err := strconv.Atoi(parts[1])
+		if err == nil {
+			month = time.Month(m)
+		}
+	}
+	if len(parts) > 2 {
+		d, err := strconv.Atoi(parts[2])
+		if err == nil {
+			day = d
+		}
+	}
+
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
 func (d *DB) AddReleaseGroup(ctx context.Context, rg ReleaseGroup) error {

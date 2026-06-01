@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"path"
+	"time"
 
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/server/component"
@@ -41,14 +42,15 @@ func (s *Server) artistWatch(ctx context.Context, rw http.ResponseWriter, r *htt
 		return err
 	}
 
-	watch.Status = true
-	if watch.Source == "" {
+	if !watch.Status {
+		watch.Status = true
+		watch.AddedAt = time.Now().Unix()
 		watch.Source = "ui"
-	}
 
-	err = s.db.AddArtistWatch(ctx, watch)
-	if err != nil {
-		return err
+		err = s.db.AddArtistWatch(ctx, watch)
+		if err != nil {
+			return err
+		}
 	}
 
 	http.Redirect(rw, r, path.Join("/artists", artistID), http.StatusSeeOther)

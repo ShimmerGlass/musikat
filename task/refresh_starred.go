@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/shimmerglass/musikat/database"
@@ -87,6 +88,7 @@ func (t *RefreshStarred) runUser(ctx context.Context, user database.User) error 
 			ArtistMBzID: starred.MBzID,
 			Source:      "subsonic",
 			Status:      true,
+			AddedAt:     time.Now().Unix(),
 		})
 		if err != nil {
 			return err

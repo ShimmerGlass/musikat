@@ -16,6 +16,7 @@ type ArtistWatch struct {
 	ArtistMBzID string `db:"artist_mb_id"`
 	Source      string `db:"source"`
 	Status      bool   `db:"status"`
+	AddedAt     int64  `db:"added_at"`
 }
 
 func (d *DB) AddArtistWatch(ctx context.Context, watch ArtistWatch) error {
@@ -56,4 +57,21 @@ func (d *DB) ArtistWatch(ctx context.Context, userID string, artistMBzID string)
 	}
 
 	return res, ok, nil
+}
+
+func (d *DB) UserArtistWatches(ctx context.Context, user User) ([]ArtistWatch, error) {
+	res := []ArtistWatch{}
+
+	err := d.gq.
+		Select("*").
+		From(tableArtistWatches).
+		Where(
+			goqu.C("user_id").Eq(user.ID),
+		).
+		Executor().ScanStructsContext(ctx, &res)
+	if err != nil {
+		return nil, fmt.Errorf("user artist watched: %w", err)
+	}
+
+	return res, nil
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/samber/lo"
 	"github.com/shimmerglass/musikat/database"
+	"github.com/xeonx/timeago"
+	"time"
 )
 
 templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch database.ArtistWatch, rgs []database.ReleaseGroup) {
@@ -66,9 +68,17 @@ templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch d
 				</div>
 			</div>
 		</h2>
+		if artist.RefreshedAt == nil {
+			<div class="rounded-lg border border-amber-500/30 bg-amber-500 p-4 text-sm text-amber-800 mb-4 text-center">
+				This artist was never refreshed, data may be missing or incomplete
+			</div>
+		}
 		@artistReleases("Album", rgs)
 		@artistReleases("EP", rgs)
 		@artistReleases("Single", rgs)
+		if artist.RefreshedAt != nil {
+			<div class="text-slate-500 italic text-sm">Last refreshed { timeago.English.Format(time.Unix(*artist.RefreshedAt, 0)) }</div>
+		}
 		<script>
 			const button = document.getElementById("watch-button");
 			const menu = document.getElementById("watch-menu");
@@ -100,7 +110,7 @@ templ artistReleases(rType string, rgs []database.ReleaseGroup) {
 			<h3 class="text-2xl font-bold mb-4">{ rType }</h3>
 			for _, rg := range subRgs {
 				<div
-					class="grid grid-cols-12 items-center border-b border-gray-100 transition hover:bg-gray-50 border-gray-200 py-3 text-sm font-semibold text-gray-600"
+					class="grid grid-cols-12 items-center [&:not(:last-child)]:border-b transition hover:bg-gray-50 border-gray-200 py-3 text-sm font-semibold text-gray-600"
 				>
 					<div class="col-span-4">
 						<div class="font-medium text-gray-900">
@@ -121,14 +131,19 @@ templ artistReleases(rType string, rgs []database.ReleaseGroup) {
 						{ rg.ReleaseDate }
 					</div>
 					<div class="col-span-2 flex justify-center">
-						if rg.InLibrary {
-							<span class="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-								In library
-							</span>
-						} else {
-							<span class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-								Missing
-							</span>
+						switch rg.LibraryStatus {
+							case database.LibraryStatusMissing:
+								<span class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+									Missing
+								</span>
+							case database.LibraryStatusPresent:
+								<span class="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+									Present
+								</span>
+							default:
+								<span class="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700">
+									Unknown
+								</span>
 						}
 					</div>
 				</div>
@@ -155,7 +170,7 @@ templ artistsMenu(artists []database.ArtistWithStats) {
 						class="absolute inset-0 bg-[linear-gradient(100deg,rgba(34,197,94,0.2)_50%,rgba(239,68,68,0.2)_50%)]"
 					></div>
 					<span class="relative px-3 py-1 text-green-400">
-						{ artist.InLibrary }
+						{ artist.Present }
 					</span>
 					<span class="relative px-3 py-1 text-red-400">
 						{ artist.Missing }

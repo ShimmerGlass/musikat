@@ -15,13 +15,21 @@ const (
 	tableReleaseGroupArtists = "release_group_artists"
 )
 
+type LibraryStatus int
+
+const (
+	LibraryStatusUnknown LibraryStatus = 0
+	LibraryStatusPresent LibraryStatus = 1
+	LibraryStatusMissing LibraryStatus = 2
+)
+
 type ReleaseGroup struct {
-	MBzID                 string `db:"mb_id"`
-	Name                  string `db:"name"`
-	ReleaseType           string `db:"release_type"`
-	ReleaseDate           string `db:"release_date"`
-	InLibrary             bool   `db:"in_library"`
-	InLibraryReleaseMBzID string `db:"in_library_release_mb_id"`
+	MBzID                 string        `db:"mb_id"`
+	Name                  string        `db:"name"`
+	ReleaseType           string        `db:"release_type"`
+	ReleaseDate           string        `db:"release_date"`
+	LibraryStatus         LibraryStatus `db:"in_library"`
+	InLibraryReleaseMBzID string        `db:"in_library_release_mb_id"`
 
 	Artists []Artist `db:"-" yaml:"artists"`
 }

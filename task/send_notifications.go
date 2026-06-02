@@ -58,7 +58,7 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 		}
 
 		for _, rg := range rgs {
-			if rg.InLibrary {
+			if rg.LibraryStatus != database.LibraryStatusMissing {
 				continue
 			}
 

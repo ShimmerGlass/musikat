@@ -67,7 +67,7 @@ func (t *RefreshArtistReleases) runArtist(ctx context.Context, artist database.A
 		return err
 	}
 	rgs = lo.Map(rgs, func(rg database.ReleaseGroup, _ int) database.ReleaseGroup {
-		rg.InLibrary = existingMap[rg.MBzID].InLibrary
+		rg.LibraryStatus = existingMap[rg.MBzID].LibraryStatus
 		return rg
 	})
 

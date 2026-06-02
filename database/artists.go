@@ -16,8 +16,9 @@ const (
 var ErrArtistNotFound = fmt.Errorf("artist not found")
 
 type Artist struct {
-	MBzID string `db:"mb_id"`
-	Name  string `db:"name"`
+	MBzID       string `db:"mb_id"`
+	Name        string `db:"name"`
+	RefreshedAt *int64 `db:"refreshed_at"`
 }
 
 func (a Artist) MBzURL() string {
@@ -31,8 +32,8 @@ func (a Artist) UIPath() string {
 type ArtistWithStats struct {
 	Artist
 
-	InLibrary int
-	Missing   int
+	Present int
+	Missing int
 }
 
 func (d *DB) AddArtist(ctx context.Context, artist Artist) error {
@@ -43,7 +44,8 @@ func (d *DB) AddArtist(ctx context.Context, artist Artist) error {
 		Insert(tableArtists).
 		Rows(artist).
 		OnConflict(goqu.DoUpdate("mb_id", goqu.Record{
-			"name": goqu.L("excluded.name"),
+			"name":         goqu.L("excluded.name"),
+			"refreshed_at": goqu.L("excluded.refreshed_at"),
 		})).
 		Executor().ExecContext(ctx)
 
@@ -173,13 +175,13 @@ func (d *DB) UserWatchedArtistsWithStats(ctx context.Context, user User) ([]Arti
 			return nil, err
 		}
 
-		inLib := lo.CountBy(rgs, func(rg ReleaseGroup) bool { return rg.InLibrary })
-		missing := lo.CountBy(rgs, func(rg ReleaseGroup) bool { return !rg.InLibrary })
+		present := lo.CountBy(rgs, func(rg ReleaseGroup) bool { return rg.LibraryStatus == LibraryStatusPresent })
+		missing := lo.CountBy(rgs, func(rg ReleaseGroup) bool { return rg.LibraryStatus == LibraryStatusMissing })
 
 		res = append(res, ArtistWithStats{
-			Artist:    artist,
-			InLibrary: inLib,
-			Missing:   missing,
+			Artist:  artist,
+			Present: present,
+			Missing: missing,
 		})
 	}
 

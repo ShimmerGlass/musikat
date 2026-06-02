@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/shimmerglass/musikat/database"
@@ -79,9 +80,11 @@ func (t *RefreshInLibrary) RunArtist(ctx context.Context, artist database.Artist
 		}
 
 		inLib := lo.Intersect(inLibReleases, allReleaseIDs)
-		releaseGroup.InLibrary = len(inLib) > 0
 		if len(inLib) > 0 {
+			releaseGroup.LibraryStatus = database.LibraryStatusPresent
 			releaseGroup.InLibraryReleaseMBzID = inLib[0]
+		} else {
+			releaseGroup.LibraryStatus = database.LibraryStatusMissing
 		}
 
 		err = t.db.AddReleaseGroup(ctx, releaseGroup)
@@ -90,7 +93,9 @@ func (t *RefreshInLibrary) RunArtist(ctx context.Context, artist database.Artist
 		}
 	}
 
-	return nil
+	artist.RefreshedAt = new(time.Now().Unix())
+
+	return t.db.AddArtist(ctx, artist)
 }
 
 func (t *RefreshInLibrary) subsonic(ctx context.Context) (*subsonic.User, error) {

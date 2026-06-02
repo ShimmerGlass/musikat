@@ -4,6 +4,6 @@
 
 /.env
 /musikat
-/musikat.db
+/musikat.db*
 
 *_templ.go

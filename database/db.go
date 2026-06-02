@@ -27,9 +27,7 @@ func New(cfg Config) (*DB, error) {
 	dbURL.Path = lo.Must(filepath.Abs(cfg.Path))
 
 	query := url.Values{}
-	query.Set("_time_integer_format", "unix")
 	query.Set("_pragma", "journal_mode = WAL")
-
 	dbURL.RawQuery = query.Encode()
 
 	db, err := sql.Open("sqlite", dbURL.String())

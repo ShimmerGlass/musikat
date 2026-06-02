@@ -25,6 +25,9 @@ type User struct {
 }
 
 func (d *DB) AddUser(ctx context.Context, user User) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	_, err := d.gq.
 		Insert(tableUsers).
 		Rows(user).
@@ -76,6 +79,9 @@ func (d *DB) User(ctx context.Context, id string) (User, error) {
 }
 
 func (d *DB) UserDelete(ctx context.Context, id string) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	_, err := d.gq.
 		Delete(tableUsers).
 		Where(goqu.C("id").Eq(id)).

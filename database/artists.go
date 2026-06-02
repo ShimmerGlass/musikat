@@ -36,6 +36,9 @@ type ArtistWithStats struct {
 }
 
 func (d *DB) AddArtist(ctx context.Context, artist Artist) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	_, err := d.gq.
 		Insert(tableArtists).
 		Rows(artist).

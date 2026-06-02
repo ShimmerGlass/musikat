@@ -20,6 +20,9 @@ type ArtistWatch struct {
 }
 
 func (d *DB) AddArtistWatch(ctx context.Context, watch ArtistWatch) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	_, err := d.gq.Insert(tableArtistWatches).
 		Rows(watch).
 		OnConflict(goqu.DoUpdate("artist_mb_id, user_id", goqu.Record{

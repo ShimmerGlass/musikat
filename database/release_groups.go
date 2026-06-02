@@ -57,6 +57,9 @@ func (r ReleaseGroup) ReleaseTime() time.Time {
 }
 
 func (d *DB) AddReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	_, err := d.gq.Insert(tableReleaseGroups).
 		Rows(rg).
 		OnConflict(goqu.DoUpdate("mb_id", goqu.Record{
@@ -87,6 +90,9 @@ func (d *DB) AddReleaseGroupWithArtists(ctx context.Context, rg ReleaseGroup) er
 }
 
 func (d *DB) replaceReleaseGroupArtists(ctx context.Context, rg ReleaseGroup) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	_, err := d.gq.
 		Delete(tableReleaseGroupArtists).
 		Where(goqu.Ex{
@@ -108,6 +114,7 @@ func (d *DB) replaceReleaseGroupArtists(ctx context.Context, rg ReleaseGroup) er
 	_, err = d.gq.
 		Insert(tableReleaseGroupArtists).
 		Rows(recs...).
+		OnConflict(goqu.DoNothing()).
 		Executor().ExecContext(ctx)
 	if err != nil {
 		return fmt.Errorf("replace release group artists: %w", err)

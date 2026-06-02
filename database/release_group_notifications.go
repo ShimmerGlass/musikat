@@ -10,6 +10,9 @@ import (
 const tableReleaseGroupNotifications = "release_group_notifications"
 
 func (d *DB) AddReleaseGroupNotification(ctx context.Context, rgID, userID string) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	_, err := d.gq.
 		Insert(tableReleaseGroupNotifications).
 		Rows(goqu.Record{

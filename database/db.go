@@ -3,9 +3,13 @@ package database
 import (
 	"context"
 	"database/sql"
+	"net/url"
+	"path/filepath"
+	"sync"
 
 	"github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
+	"github.com/samber/lo"
 	"github.com/shimmerglass/musikat/database/migration"
 	_ "modernc.org/sqlite"
 )
@@ -13,10 +17,22 @@ import (
 type DB struct {
 	sql *sql.DB
 	gq  *goqu.Database
+
+	lock sync.RWMutex
 }
 
 func New(cfg Config) (*DB, error) {
-	db, err := sql.Open("sqlite", cfg.Path+"?_time_integer_format=unix")
+	dbURL := url.URL{}
+	dbURL.Scheme = "file"
+	dbURL.Path = lo.Must(filepath.Abs(cfg.Path))
+
+	query := url.Values{}
+	query.Set("_time_integer_format", "unix")
+	query.Set("_pragma", "journal_mode = WAL")
+
+	dbURL.RawQuery = query.Encode()
+
+	db, err := sql.Open("sqlite", dbURL.String())
 	if err != nil {
 		return nil, err
 	}

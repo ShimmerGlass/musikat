@@ -2,18 +2,22 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
+	opt "github.com/shimmerglass/go-optional"
 )
 
 const (
 	tableReleaseGroups       = "release_groups"
 	tableReleaseGroupArtists = "release_group_artists"
 )
+
+var ErrReleaseGroupNotFound = fmt.Errorf("release group not found")
 
 type LibraryStatus int
 
@@ -65,7 +69,7 @@ func (r ReleaseGroup) ReleaseTime() time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
-func (d *DB) AddReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
+func (d *DB) addReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -77,6 +81,7 @@ func (d *DB) AddReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
 			"in_library_release_mb_id": goqu.L("excluded.in_library_release_mb_id"),
 			"primary_type":             goqu.L("excluded.primary_type"),
 			"secondary_type":           goqu.L("excluded.secondary_type"),
+			"release_date":             goqu.L("excluded.release_date"),
 		})).
 		Executor().ExecContext(ctx)
 	if err != nil {
@@ -86,21 +91,40 @@ func (d *DB) AddReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
 	return nil
 }
 
-func (d *DB) AddReleaseGroupWithArtists(ctx context.Context, rg ReleaseGroup) error {
-	err := d.AddReleaseGroup(ctx, rg)
+func (d *DB) PutReleaseGroup(ctx context.Context, id string, do func(opt.Option[ReleaseGroup]) ReleaseGroup) error {
+	var newReleaseGroup ReleaseGroup
+	existing, err := d.ReleaseGroup(ctx, id)
+	if errors.Is(err, ErrReleaseGroupNotFound) {
+		newReleaseGroup = do(opt.None[ReleaseGroup]())
+	}
 	if err != nil {
 		return err
 	}
+	newReleaseGroup = do(opt.Some(existing))
 
-	err = d.replaceReleaseGroupArtists(ctx, rg)
-	if err != nil {
-		return fmt.Errorf("add release group: %w", err)
-	}
-
-	return nil
+	return d.addReleaseGroup(ctx, newReleaseGroup)
 }
 
-func (d *DB) replaceReleaseGroupArtists(ctx context.Context, rg ReleaseGroup) error {
+func (d *DB) ReleaseGroup(ctx context.Context, mbzID string) (ReleaseGroup, error) {
+	rg := ReleaseGroup{}
+	ok, err := d.gq.
+		Select("*").
+		From(tableReleaseGroups).
+		Where(goqu.Ex{
+			"mb_id": mbzID,
+		}).
+		Executor().ScanStructContext(ctx, &rg)
+	if err != nil {
+		return ReleaseGroup{}, fmt.Errorf("release group by id: %w", err)
+	}
+	if !ok {
+		return ReleaseGroup{}, ErrReleaseGroupNotFound
+	}
+
+	return rg, nil
+}
+
+func (d *DB) ReplaceReleaseGroupArtists(ctx context.Context, rg ReleaseGroup) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 

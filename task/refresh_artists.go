@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	opt "github.com/shimmerglass/go-optional"
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/subsonic"
 )
@@ -35,7 +36,13 @@ func (t *RefreshArtists) Run(ctx context.Context) error {
 	}
 
 	for _, artist := range artists {
-		err := t.db.AddArtist(ctx, artist)
+		err := t.db.PutArtist(ctx, artist.MBzID, func(o opt.Option[database.Artist]) database.Artist {
+			a := o.TakeOr(artist)
+			a.MBzID = artist.MBzID
+			a.Name = artist.Name
+
+			return a
+		})
 		if err != nil {
 			return err
 		}

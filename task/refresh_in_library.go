@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/samber/lo"
+	opt "github.com/shimmerglass/go-optional"
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/musicbrainz"
 	"github.com/shimmerglass/musikat/subsonic"
@@ -80,22 +81,27 @@ func (t *RefreshInLibrary) RunArtist(ctx context.Context, artist database.Artist
 		}
 
 		inLib := lo.Intersect(inLibReleases, allReleaseIDs)
-		if len(inLib) > 0 {
-			releaseGroup.LibraryStatus = database.LibraryStatusPresent
-			releaseGroup.InLibraryReleaseMBzID = inLib[0]
-		} else {
-			releaseGroup.LibraryStatus = database.LibraryStatusMissing
-		}
-
-		err = t.db.AddReleaseGroup(ctx, releaseGroup)
+		err = t.db.PutReleaseGroup(ctx, releaseGroup.MBzID, func(o opt.Option[database.ReleaseGroup]) database.ReleaseGroup {
+			rg := o.TakeOr(releaseGroup)
+			if len(inLib) > 0 {
+				rg.LibraryStatus = database.LibraryStatusPresent
+				rg.InLibraryReleaseMBzID = inLib[0]
+			} else {
+				rg.LibraryStatus = database.LibraryStatusMissing
+			}
+			return rg
+		})
 		if err != nil {
 			return err
 		}
 	}
 
-	artist.RefreshedAt = new(time.Now().Unix())
+	return t.db.PutArtist(ctx, artist.MBzID, func(o opt.Option[database.Artist]) database.Artist {
+		a := o.TakeOr(artist)
+		a.RefreshedAt = new(time.Now().Unix())
+		return a
 
-	return t.db.AddArtist(ctx, artist)
+	})
 }
 
 func (t *RefreshInLibrary) subsonic(ctx context.Context) (*subsonic.User, error) {

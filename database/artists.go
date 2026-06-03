@@ -2,11 +2,13 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/samber/lo"
+	opt "github.com/shimmerglass/go-optional"
 )
 
 const (
@@ -36,7 +38,7 @@ type ArtistWithStats struct {
 	Missing int
 }
 
-func (d *DB) AddArtist(ctx context.Context, artist Artist) error {
+func (d *DB) addArtist(ctx context.Context, artist Artist) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -56,6 +58,20 @@ func (d *DB) AddArtist(ctx context.Context, artist Artist) error {
 	return nil
 }
 
+func (d *DB) PutArtist(ctx context.Context, id string, do func(opt.Option[Artist]) Artist) error {
+	var newArtist Artist
+	existing, err := d.Artist(ctx, id)
+	if errors.Is(err, ErrArtistNotFound) {
+		newArtist = do(opt.None[Artist]())
+	}
+	if err != nil {
+		return err
+	}
+	newArtist = do(opt.Some(existing))
+
+	return d.addArtist(ctx, newArtist)
+}
+
 func (d *DB) Artist(ctx context.Context, mbzID string) (Artist, error) {
 	artist := Artist{}
 	ok, err := d.gq.
@@ -66,7 +82,7 @@ func (d *DB) Artist(ctx context.Context, mbzID string) (Artist, error) {
 		}).
 		Executor().ScanStructContext(ctx, &artist)
 	if err != nil {
-		return Artist{}, fmt.Errorf("list watched artists: select: %w", err)
+		return Artist{}, fmt.Errorf("artist by id: %w", err)
 	}
 	if !ok {
 		return Artist{}, ErrArtistNotFound

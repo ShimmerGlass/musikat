@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/samber/lo"
+	opt "github.com/shimmerglass/go-optional"
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/subsonic"
 )
@@ -70,7 +71,9 @@ func (t *RefreshStarred) runUser(ctx context.Context, user database.User) error 
 			continue
 		}
 
-		err := t.db.AddArtist(ctx, starred)
+		err := t.db.PutArtist(ctx, starred.MBzID, func(o opt.Option[database.Artist]) database.Artist {
+			return o.TakeOr(starred)
+		})
 		if err != nil {
 			return err
 		}

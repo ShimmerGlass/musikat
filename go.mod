@@ -11,7 +11,9 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/samber/lo v1.53.0
 	github.com/sethvargo/go-envconfig v1.3.0
+	github.com/shimmerglass/go-optional v0.1.0
 	github.com/stretchr/testify v1.11.1
+	github.com/xeonx/timeago v1.0.0-rc5
 	go.uploadedlobster.com/mbtypes v0.4.0
 	go.uploadedlobster.com/musicbrainzws2 v0.18.0
 	golang.org/x/crypto v0.51.0
@@ -203,7 +205,6 @@ require (
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.1 // indirect
 	github.com/xdg-go/stringprep v1.0.3 // indirect
-	github.com/xeonx/timeago v1.0.0-rc5 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect

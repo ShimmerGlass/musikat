@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/samber/lo"
+	opt "github.com/shimmerglass/go-optional"
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/musicbrainz"
 )
@@ -73,13 +74,28 @@ func (t *RefreshArtistReleases) runArtist(ctx context.Context, artist database.A
 
 	for _, rg := range rgs {
 		for _, rgArtist := range rg.Artists {
-			err := t.db.AddArtist(ctx, rgArtist)
+			err := t.db.PutArtist(ctx, rgArtist.MBzID, func(o opt.Option[database.Artist]) database.Artist {
+				return o.TakeOr(rgArtist)
+			})
 			if err != nil {
 				return err
 			}
 		}
 
-		err := t.db.AddReleaseGroupWithArtists(ctx, rg)
+		err := t.db.PutReleaseGroup(ctx, rg.MBzID, func(o opt.Option[database.ReleaseGroup]) database.ReleaseGroup {
+			r := o.TakeOr(rg)
+			r.Name = rg.Name
+			r.PrimaryType = rg.PrimaryType
+			r.SecondaryType = rg.SecondaryType
+			r.ReleaseDate = rg.ReleaseDate
+
+			return r
+		})
+		if err != nil {
+			return err
+		}
+
+		err = t.db.ReplaceReleaseGroupArtists(ctx, rg)
 		if err != nil {
 			return err
 		}

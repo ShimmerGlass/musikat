@@ -26,7 +26,8 @@ const (
 type ReleaseGroup struct {
 	MBzID                 string        `db:"mb_id"`
 	Name                  string        `db:"name"`
-	ReleaseType           string        `db:"release_type"`
+	PrimaryType           string        `db:"primary_type"`
+	SecondaryType         string        `db:"secondary_type"`
 	ReleaseDate           string        `db:"release_date"`
 	LibraryStatus         LibraryStatus `db:"in_library"`
 	InLibraryReleaseMBzID string        `db:"in_library_release_mb_id"`
@@ -74,6 +75,8 @@ func (d *DB) AddReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
 			"name":                     goqu.L("excluded.name"),
 			"in_library":               goqu.L("excluded.in_library"),
 			"in_library_release_mb_id": goqu.L("excluded.in_library_release_mb_id"),
+			"primary_type":             goqu.L("excluded.primary_type"),
+			"secondary_type":           goqu.L("excluded.secondary_type"),
 		})).
 		Executor().ExecContext(ctx)
 	if err != nil {

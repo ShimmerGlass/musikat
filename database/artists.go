@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/samber/lo"
@@ -34,8 +35,9 @@ func (a Artist) UIPath() string {
 type ArtistWithStats struct {
 	Artist
 
-	Present int
-	Missing int
+	Upcoming int
+	Present  int
+	Missing  int
 }
 
 func (d *DB) addArtist(ctx context.Context, artist Artist) error {
@@ -183,6 +185,7 @@ func (d *DB) UserWatchedArtistsWithStats(ctx context.Context, user User) ([]Arti
 	if err != nil {
 		return nil, err
 	}
+	now := time.Now()
 
 	res := []ArtistWithStats{}
 	for _, artist := range artists {
@@ -192,12 +195,19 @@ func (d *DB) UserWatchedArtistsWithStats(ctx context.Context, user User) ([]Arti
 		}
 
 		present := lo.CountBy(rgs, func(rg ReleaseGroup) bool { return rg.LibraryStatus == LibraryStatusPresent })
-		missing := lo.CountBy(rgs, func(rg ReleaseGroup) bool { return rg.LibraryStatus == LibraryStatusMissing })
+		missing := lo.CountBy(rgs, func(rg ReleaseGroup) bool {
+			return rg.LibraryStatus == LibraryStatusMissing && rg.ReleaseTime().Before(now)
+		})
+		upcoming := lo.CountBy(rgs, func(rg ReleaseGroup) bool {
+			return rg.ReleaseTime().After(now)
+		})
 
 		res = append(res, ArtistWithStats{
-			Artist:  artist,
-			Present: present,
-			Missing: missing,
+			Artist: artist,
+
+			Upcoming: upcoming,
+			Present:  present,
+			Missing:  missing,
 		})
 	}
 

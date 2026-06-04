@@ -195,18 +195,32 @@ templ artistsMenu(artists []database.ArtistWithStats) {
 		<div class="artist-item" data-name={ artist.Name }>
 			@menuItem(artist.Name, fmt.Sprintf("/artists/%s", artist.MBzID)) {
 				<div
-					class="relative flex items-center overflow-hidden rounded-full text-xs font-semibold"
-					title="Found / Missing"
+					class="flex items-center rounded-full text-xs font-semibold overflow-hidden"
 				>
-					<div
-						class="absolute inset-0 bg-[linear-gradient(100deg,rgba(34,197,94,0.2)_50%,rgba(239,68,68,0.2)_50%)]"
-					></div>
-					<span class="relative px-3 py-1 text-green-400">
-						{ artist.Present }
-					</span>
-					<span class="relative px-3 py-1 text-red-400">
-						{ artist.Missing }
-					</span>
+					if artist.Upcoming > 0 {
+						<span title="Upcoming" class="inline-flex items-center gap-2 bg-cyan-400/20 px-3 py-1 text-cyan-300">
+							<span class="relative flex h-2 w-2">
+								<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75"></span>
+								<span class="relative inline-flex h-2 w-2 rounded-full bg-cyan-400"></span>
+							</span>
+							{ artist.Upcoming }
+						</span>
+					}
+					if artist.Present > 0 {
+						<span title="Present" class="relative px-3 py-1 text-green-400 bg-green-400/20">
+							{ artist.Present }
+						</span>
+					}
+					if artist.Missing > 0 {
+						<span title="Missing" class="relative px-3 py-1 text-red-400 bg-red-400/20">
+							{ artist.Missing }
+						</span>
+					}
+					if artist.RefreshedAt == nil {
+						<span title="Unknown" class="relative px-3 py-1 text-yellow-400 bg-yellow-400/20">
+							?
+						</span>
+					}
 				</div>
 			}
 		</div>

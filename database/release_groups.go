@@ -96,11 +96,11 @@ func (d *DB) PutReleaseGroup(ctx context.Context, id string, do func(opt.Option[
 	existing, err := d.ReleaseGroup(ctx, id)
 	if errors.Is(err, ErrReleaseGroupNotFound) {
 		newReleaseGroup = do(opt.None[ReleaseGroup]())
-	}
-	if err != nil {
+	} else if err != nil {
 		return err
+	} else {
+		newReleaseGroup = do(opt.Some(existing))
 	}
-	newReleaseGroup = do(opt.Some(existing))
 
 	return d.addReleaseGroup(ctx, newReleaseGroup)
 }

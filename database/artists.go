@@ -63,11 +63,11 @@ func (d *DB) PutArtist(ctx context.Context, id string, do func(opt.Option[Artist
 	existing, err := d.Artist(ctx, id)
 	if errors.Is(err, ErrArtistNotFound) {
 		newArtist = do(opt.None[Artist]())
-	}
-	if err != nil {
+	} else if err != nil {
 		return err
+	} else {
+		newArtist = do(opt.Some(existing))
 	}
-	newArtist = do(opt.Some(existing))
 
 	return d.addArtist(ctx, newArtist)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/musicbrainz"
+	"github.com/shimmerglass/musikat/navidrome"
 	"github.com/shimmerglass/musikat/notification"
 	"github.com/shimmerglass/musikat/server"
 	"github.com/shimmerglass/musikat/subsonic"
@@ -32,6 +33,7 @@ func run() error {
 	}
 
 	sub := subsonic.New(cfg.Subsonic)
+	navi := navidrome.New(navidrome.Config(cfg.Subsonic))
 	mbz := musicbrainz.New()
 
 	var notif notification.Notifier
@@ -44,7 +46,7 @@ func run() error {
 		notif = &notification.Noop{}
 	}
 
-	tasks := task.New(cfg.Refresh, db, mbz, sub, notif)
+	tasks := task.New(cfg.Refresh, db, mbz, sub, navi, notif)
 	tasks.Start()
 
 	srv := server.New(cfg.Server, db, tasks)

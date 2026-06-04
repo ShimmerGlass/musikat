@@ -75,7 +75,7 @@ func (m *MusicBrainz) ArtistReleaseGroups(ctx context.Context, artistMBzID strin
 	}), nil
 }
 
-func (m *MusicBrainz) ReleaseGroupsReleases(ctx context.Context, releaseGroupMBzID string) ([]string, error) {
+func (m *MusicBrainz) ReleaseGroupsReleases(ctx context.Context, releaseGroupMBzID string) ([]mbz.Release, error) {
 	releases := []mbz.Release{}
 	paginator := paginator()
 
@@ -83,6 +83,7 @@ func (m *MusicBrainz) ReleaseGroupsReleases(ctx context.Context, releaseGroupMBz
 		<-m.tick
 		mbRes, err := m.client.BrowseReleases(ctx, mbz.ReleaseFilter{
 			ReleaseGroupMBID: mbtypes.MBID(releaseGroupMBzID),
+			Includes:         []string{"recordings"},
 		}, paginator)
 		if err != nil {
 			return nil, err
@@ -96,9 +97,7 @@ func (m *MusicBrainz) ReleaseGroupsReleases(ctx context.Context, releaseGroupMBz
 		paginator.Offset += len(mbRes.Releases)
 	}
 
-	return lo.Map(releases, func(rel mbz.Release, _ int) string {
-		return string(rel.ID)
-	}), nil
+	return releases, nil
 }
 
 func paginator() mbz.Paginator {

@@ -74,8 +74,8 @@ templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch d
 		}
 		{{ pastRg, upcomingRg := splitByDate(rgs) }}
 		if len(upcomingRg) > 0 {
-			<div class="rounded-md bg-cyan-100 border border-cyan-500 mb-4 px-6 py-4">
-				<h3 class="text-2xl font-bold mb-4 text-cyan-600">Upcoming releases</h3>
+			<div class="rounded-md bg-pink-100 border border-pink-500 mb-4 px-6 py-4">
+				<h3 class="text-2xl font-bold mb-4 text-pink-600">Upcoming releases</h3>
 				for _, rg := range upcomingRg {
 					@releaseInfo(rg) {
 						@Bubble("blue") {
@@ -177,6 +177,10 @@ templ releaseStatus(rg database.ReleaseGroup) {
 			@Bubble("green") {
 				Present
 			}
+		case database.LibraryStatusSongsPresent:
+			@Bubble("cyan") {
+				Songs present
+			}
 		default:
 			@Bubble("yellow") {
 				Unknown
@@ -198,10 +202,10 @@ templ artistsMenu(artists []database.ArtistWithStats) {
 					class="flex items-center rounded-full text-xs font-semibold overflow-hidden"
 				>
 					if artist.Upcoming > 0 {
-						<span title="Upcoming" class="inline-flex items-center gap-2 bg-cyan-400/20 px-3 py-1 text-cyan-300">
+						<span title="Upcoming" class="inline-flex items-center gap-2 bg-pink-400/20 px-3 py-1 text-pink-300">
 							<span class="relative flex h-2 w-2">
-								<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75"></span>
-								<span class="relative inline-flex h-2 w-2 rounded-full bg-cyan-400"></span>
+								<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75"></span>
+								<span class="relative inline-flex h-2 w-2 rounded-full bg-pink-400"></span>
 							</span>
 							{ artist.Upcoming }
 						</span>

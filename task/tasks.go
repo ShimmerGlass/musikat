@@ -11,6 +11,7 @@ import (
 
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/musicbrainz"
+	"github.com/shimmerglass/musikat/navidrome"
 	"github.com/shimmerglass/musikat/notification"
 	"github.com/shimmerglass/musikat/subsonic"
 )
@@ -38,6 +39,7 @@ func New(
 	db *database.DB,
 	mbz *musicbrainz.MusicBrainz,
 	sub *subsonic.Subsonic,
+	navi *navidrome.Client,
 	notifier notification.Notifier,
 ) *Tasks {
 	return &Tasks{
@@ -48,7 +50,7 @@ func New(
 			NewRefreshArtists(db, sub),
 			NewRefreshStarred(db, sub),
 			NewRefreshArtistReleases(db, mbz),
-			NewRefreshInLibrary(db, mbz, sub),
+			NewRefreshInLibrary(db, mbz, sub, navi),
 			NewSendNotifications(db, notifier),
 		},
 	}

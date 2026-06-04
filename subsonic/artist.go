@@ -2,7 +2,6 @@ package subsonic
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/delucks/go-subsonic"
@@ -12,16 +11,8 @@ import (
 
 var ErrArtistNotFound = fmt.Errorf("artist not found")
 
-func (s *User) ArtistReleases(ctx context.Context, artist database.Artist) ([]string, error) {
-	id, err := s.artistSubsonicID(ctx, artist)
-	if errors.Is(err, ErrArtistNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	subArtist, err := s.client.GetArtist(id)
+func (s *User) ArtistReleases(ctx context.Context, artistID string) ([]string, error) {
+	subArtist, err := s.client.GetArtist(artistID)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +31,7 @@ func (s *User) ArtistReleases(ctx context.Context, artist database.Artist) ([]st
 	return res, nil
 }
 
-func (s *User) artistSubsonicID(ctx context.Context, artist database.Artist) (string, error) {
+func (s *User) ArtistSubsonicID(ctx context.Context, artist database.Artist) (string, error) {
 	search, err := s.client.Search3(artist.Name, map[string]string{
 		"albumCount": "0",
 		"songCount":  "0",

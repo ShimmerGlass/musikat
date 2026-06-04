@@ -22,9 +22,10 @@ var ErrReleaseGroupNotFound = fmt.Errorf("release group not found")
 type LibraryStatus int
 
 const (
-	LibraryStatusUnknown LibraryStatus = 0
-	LibraryStatusPresent LibraryStatus = 1
-	LibraryStatusMissing LibraryStatus = 2
+	LibraryStatusUnknown      LibraryStatus = 0
+	LibraryStatusPresent      LibraryStatus = 1
+	LibraryStatusMissing      LibraryStatus = 2
+	LibraryStatusSongsPresent LibraryStatus = 3
 )
 
 type ReleaseGroup struct {

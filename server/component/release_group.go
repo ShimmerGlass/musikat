@@ -3,10 +3,24 @@ package component
 import (
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/shimmerglass/musikat/database"
 )
+
+func splitByDate(rgs []database.ReleaseGroup) (past, upcoming []database.ReleaseGroup) {
+	now := time.Now()
+
+	for _, rg := range rgs {
+		if rg.ReleaseTime().After(now) {
+			upcoming = append(upcoming, rg)
+		} else {
+			past = append(past, rg)
+		}
+	}
+	return
+}
 
 var primaryOrder = map[string]int{
 	"Album":     0,

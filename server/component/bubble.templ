@@ -1,0 +1,9 @@
+package component
+
+import "fmt"
+
+templ Bubble(color string) {
+	<span class={ "rounded-full px-3 py-1 text-xs font-semibold", fmt.Sprintf("bg-%s-100", color), fmt.Sprintf("text-%s-700", color) }>
+		{ children... }
+	</span>
+}

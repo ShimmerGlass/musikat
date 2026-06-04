@@ -68,11 +68,24 @@ templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch d
 			</div>
 		</h2>
 		if artist.RefreshedAt == nil {
-			<div class="rounded-lg border border-amber-500/30 bg-amber-500 p-4 text-sm text-amber-800 mb-4 text-center">
+			<div class="rounded-md border border-amber-500 bg-amber-100 p-4 text-sm text-amber-800 mb-4 text-center">
 				This artist was never refreshed, data may be missing or incomplete
 			</div>
 		}
-		{{ rgGroups := groupReleaseGroups(rgs) }}
+		{{ pastRg, upcomingRg := splitByDate(rgs) }}
+		if len(upcomingRg) > 0 {
+			<div class="rounded-md bg-cyan-100 border border-cyan-500 mb-4 px-6 py-4">
+				<h3 class="text-2xl font-bold mb-4 text-cyan-600">Upcoming releases</h3>
+				for _, rg := range upcomingRg {
+					@releaseInfo(rg) {
+						@Bubble("blue") {
+							{ rg.PrimaryType }
+						}
+					}
+				}
+			</div>
+		}
+		{{ rgGroups := groupReleaseGroups(pastRg) }}
 		for _, group := range rgGroups {
 			@artistReleases(group)
 		}
@@ -98,10 +111,8 @@ templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch d
 }
 
 templ artistReleases(group groupedReleaseGroups) {
-	<div
-		class="px-6 py-4 mb-4 transition bg-gray-50 rounded-md"
-	>
-		<h3 class="text-2xl font-bold mb-4">
+	@releaseListBlock() {
+		<h3 class="text-xl font-bold mb-4">
 			{ group.PrimaryType }
 			<span class="text-xl text-slate-600">
 				for i, st := range group.SecondaryTypes {
@@ -113,46 +124,64 @@ templ artistReleases(group groupedReleaseGroups) {
 			</span>
 		</h3>
 		for _, rg := range group.ReleaseGroups {
-			<div
-				class="grid grid-cols-12 items-center [&:not(:last-child)]:border-b transition hover:bg-gray-50 border-gray-200 py-3 text-sm font-semibold text-gray-600"
-			>
-				<div class="col-span-4">
-					<div class="font-medium text-gray-900">
-						<a href={ templ.URL(rg.MBzURL()) } class="underline">
-							{ rg.Name }
-						</a>
-					</div>
-				</div>
-				<div class="col-span-4 text-sm text-gray-400">
-					for i, artist := range rg.Artists {
-						if i > 0 {
-							,
-						}
-						<a href={ templ.URL(artist.UIPath()) } class="underline text-gray-600">{ artist.Name }</a>
-					}
-				</div>
-				<div class="col-span-2 flex justify-center">
-					{ rg.ReleaseDate }
-				</div>
-				<div class="col-span-2 flex justify-center">
-					switch rg.LibraryStatus {
-						case database.LibraryStatusMissing:
-							<span class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-								Missing
-							</span>
-						case database.LibraryStatusPresent:
-							<span class="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-								Present
-							</span>
-						default:
-							<span class="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700">
-								Unknown
-							</span>
-					}
-				</div>
-			</div>
+			@releaseInfo(rg) {
+				@releaseStatus(rg)
+			}
 		}
+	}
+}
+
+templ releaseListBlock() {
+	<div
+		class="px-6 py-4 mb-4 transition bg-gray-50 rounded-md"
+	>
+		{ children... }
 	</div>
+}
+
+templ releaseInfo(rg database.ReleaseGroup) {
+	<div
+		class="grid grid-cols-12 items-center [&:not(:last-child)]:border-b border-gray-200 py-3 text-sm font-semibold text-gray-600"
+	>
+		<div class="col-span-4">
+			<div class="font-medium text-gray-900">
+				<a href={ templ.URL(rg.MBzURL()) } class="underline">
+					{ rg.Name }
+				</a>
+			</div>
+		</div>
+		<div class="col-span-4 text-sm text-gray-400">
+			for i, artist := range rg.Artists {
+				if i > 0 {
+					,
+				}
+				<a href={ templ.URL(artist.UIPath()) } class="underline text-gray-600">{ artist.Name }</a>
+			}
+		</div>
+		<div class="col-span-2 flex justify-center">
+			{ rg.ReleaseDate }
+		</div>
+		<div class="col-span-2 flex justify-center">
+			{ children... }
+		</div>
+	</div>
+}
+
+templ releaseStatus(rg database.ReleaseGroup) {
+	switch rg.LibraryStatus {
+		case database.LibraryStatusMissing:
+			@Bubble("red") {
+				Missing
+			}
+		case database.LibraryStatusPresent:
+			@Bubble("green") {
+				Present
+			}
+		default:
+			@Bubble("yellow") {
+				Unknown
+			}
+	}
 }
 
 templ artistsMenu(artists []database.ArtistWithStats) {

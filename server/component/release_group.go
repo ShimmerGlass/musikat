@@ -39,15 +39,15 @@ type groupedReleaseGroups struct {
 
 func groupReleaseGroups(rgs []database.ReleaseGroup) []groupedReleaseGroups {
 	m := lo.GroupBy(rgs, func(rg database.ReleaseGroup) string {
-		return rg.PrimaryType + "\\" + rg.SecondaryType
+		return rg.PrimaryType + "\\" + rg.XXSecondaryTypes
 	})
 
 	items := lo.Entries(m)
 	slices.SortFunc(items, func(a, b lo.Entry[string, []database.ReleaseGroup]) int {
 		aPrimary := a.Value[0].PrimaryType
-		aSecondary := a.Value[0].SecondaryType
+		aSecondary := a.Value[0].XXSecondaryTypes
 		bPrimary := b.Value[0].PrimaryType
-		bSecondary := b.Value[0].SecondaryType
+		bSecondary := b.Value[0].XXSecondaryTypes
 
 		if aSecondary == "" && bSecondary != "" {
 			return -1
@@ -66,7 +66,7 @@ func groupReleaseGroups(rgs []database.ReleaseGroup) []groupedReleaseGroups {
 	return lo.Map(items, func(item lo.Entry[string, []database.ReleaseGroup], _ int) groupedReleaseGroups {
 		return groupedReleaseGroups{
 			PrimaryType:    item.Value[0].PrimaryType,
-			SecondaryTypes: strings.Split(item.Value[0].SecondaryType, ","),
+			SecondaryTypes: item.Value[0].SecondaryTypes(),
 			ReleaseGroups:  item.Value,
 		}
 	})

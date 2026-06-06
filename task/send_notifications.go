@@ -62,6 +62,10 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 				continue
 			}
 
+			if !watch.Watches(rg) {
+				continue
+			}
+
 			if rg.ReleaseTime().Before(time.Now()) {
 				continue
 			}

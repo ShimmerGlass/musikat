@@ -32,12 +32,19 @@ type ReleaseGroup struct {
 	MBzID                 string        `db:"mb_id"`
 	Name                  string        `db:"name"`
 	PrimaryType           string        `db:"primary_type"`
-	SecondaryType         string        `db:"secondary_type"`
+	XXSecondaryTypes      string        `db:"secondary_type"`
 	ReleaseDate           string        `db:"release_date"`
 	LibraryStatus         LibraryStatus `db:"in_library"`
 	InLibraryReleaseMBzID string        `db:"in_library_release_mb_id"`
 
 	Artists []Artist `db:"-" yaml:"artists"`
+}
+
+func (r ReleaseGroup) SecondaryTypes() []string {
+	if r.XXSecondaryTypes == "" {
+		return nil
+	}
+	return strings.Split(r.XXSecondaryTypes, ",")
 }
 
 func (r ReleaseGroup) MBzURL() string {

@@ -59,11 +59,11 @@ func (m *MusicBrainz) ArtistReleaseGroups(ctx context.Context, artistMBzID strin
 		}
 
 		return database.ReleaseGroup{
-			MBzID:         string(rg.ID),
-			Name:          rg.Title,
-			PrimaryType:   rg.PrimaryType,
-			SecondaryType: strings.Join(rg.SecondaryTypes, ","),
-			ReleaseDate:   rg.FirstReleaseDate.String(),
+			MBzID:            string(rg.ID),
+			Name:             rg.Title,
+			PrimaryType:      rg.PrimaryType,
+			XXSecondaryTypes: strings.Join(rg.SecondaryTypes, ","),
+			ReleaseDate:      rg.FirstReleaseDate.String(),
 
 			Artists: lo.Map(rg.ArtistCredit, func(artist mbz.ArtistCreditEntry, _ int) database.Artist {
 				return database.Artist{

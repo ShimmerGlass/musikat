@@ -87,11 +87,12 @@ func (t *RefreshStarred) runUser(ctx context.Context, user database.User) error 
 		}
 
 		err = t.db.AddArtistWatch(ctx, database.ArtistWatch{
-			UserID:      user.ID,
-			ArtistMBzID: starred.MBzID,
-			Source:      "subsonic",
-			Status:      true,
-			AddedAt:     time.Now().Unix(),
+			UserID:         user.ID,
+			ArtistMBzID:    starred.MBzID,
+			Source:         "subsonic",
+			Status:         true,
+			AddedAt:        time.Now().Unix(),
+			XXPrimaryTypes: "Album,EP,Single",
 		})
 		if err != nil {
 			return err

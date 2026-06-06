@@ -3,8 +3,10 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/samber/lo"
 )
 
 const (
@@ -12,11 +14,27 @@ const (
 )
 
 type ArtistWatch struct {
-	UserID      string `db:"user_id"`
-	ArtistMBzID string `db:"artist_mb_id"`
-	Source      string `db:"source"`
-	Status      bool   `db:"status"`
-	AddedAt     int64  `db:"added_at"`
+	UserID           string `db:"user_id"`
+	ArtistMBzID      string `db:"artist_mb_id"`
+	Source           string `db:"source"`
+	Status           bool   `db:"status"`
+	AddedAt          int64  `db:"added_at"`
+	XXPrimaryTypes   string `db:"primary_types"`
+	XXSecondaryTypes string `db:"secondary_types"`
+}
+
+func (w ArtistWatch) PrimaryTypes() []string {
+	return strings.Split(w.XXPrimaryTypes, ",")
+}
+
+func (w ArtistWatch) SecondaryTypes() []string {
+	return strings.Split(w.XXSecondaryTypes, ",")
+}
+
+func (w ArtistWatch) Watches(rg ReleaseGroup) bool {
+	secTypes := w.SecondaryTypes()
+	rgSecTypes := rg.SecondaryTypes()
+	return lo.Contains(w.PrimaryTypes(), lo.CoalesceOrEmpty(rg.PrimaryType, "Unknown")) && (len(rgSecTypes) == 0 || len(lo.Intersect(secTypes, rg.SecondaryTypes())) > 0)
 }
 
 func (d *DB) AddArtistWatch(ctx context.Context, watch ArtistWatch) error {
@@ -26,7 +44,9 @@ func (d *DB) AddArtistWatch(ctx context.Context, watch ArtistWatch) error {
 	_, err := d.gq.Insert(tableArtistWatches).
 		Rows(watch).
 		OnConflict(goqu.DoUpdate("artist_mb_id, user_id", goqu.Record{
-			"status": goqu.L("excluded.status"),
+			"status":          goqu.L("excluded.status"),
+			"primary_types":   goqu.L("excluded.primary_types"),
+			"secondary_types": goqu.L("excluded.secondary_types"),
 		})).
 		Executor().Exec()
 

@@ -1,0 +1,82 @@
+package component
+
+import (
+	"github.com/shimmerglass/musikat/database"
+	"slices"
+)
+
+var (
+	primaryTypes = []string{
+		"Unknown",
+		"Album",
+		"EP",
+		"Single",
+		"Broadcast",
+		"Other",
+	}
+
+	secondaryTypes = []string{
+		"Audio drama",
+		"Audiobook",
+		"Compilation",
+		"Demo",
+		"DJ-mix",
+		"Field recording",
+		"Interview",
+		"Live",
+		"Mixtape/Street",
+		"Remix",
+		"Soundtrack",
+		"Spokenword",
+	}
+)
+
+templ WatchEdit(artists []database.ArtistWithStats, watch database.ArtistWatch, artist database.Artist) {
+	{{
+		watchPrimaryTypes := watch.PrimaryTypes()
+		watchSecondaryTypes := watch.SecondaryTypes()
+	}}
+	@Layout(artist.Name, artistsMenu(artists)) {
+		<h2 class="flex text-3xl font-bold mb-4">
+			Watch: { artist.Name }
+		</h2>
+		<form method="post" action="" class="space-y-8">
+			<div
+				class="px-6 py-4 mb-4 transition bg-gray-50 rounded-md"
+			>
+				<section>
+					<h2 class="mb-4 text-lg font-semibold">Primary Types</h2>
+					<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+						for _, pt := range primaryTypes {
+							<label class="flex items-center gap-3 rounded-lg border border-gray-700 p-3 hover:bg-gray-100">
+								<input type="checkbox" name="primary_types[]" value={ pt } checked?={ slices.Contains(watchPrimaryTypes, pt) }/>
+								<span>{ pt }</span>
+							</label>
+						}
+					</div>
+				</section>
+			</div>
+			<div
+				class="px-6 py-4 mb-4 transition bg-gray-50 rounded-md"
+			>
+				<section>
+					<h2 class="mb-4 text-lg font-semibold">Secondary Types</h2>
+					<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+						for _, st := range secondaryTypes {
+							<label class="flex items-center gap-3 rounded-lg border border-gray-700 p-3 hover:bg-gray-100">
+								<input type="checkbox" name="secondary_types[]" value={ st } checked?={ slices.Contains(watchSecondaryTypes, st) }/>
+								<span>{ st }</span>
+							</label>
+						}
+					</div>
+				</section>
+			</div>
+			<button
+				type="submit"
+				class="rounded-lg bg-black px-4 py-2 font-medium text-white"
+			>
+				Save Settings
+			</button>
+		</form>
+	}
+}

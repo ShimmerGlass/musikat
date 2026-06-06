@@ -2,6 +2,7 @@ package component
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/shimmerglass/musikat/database"
 	"github.com/xeonx/timeago"
 	"time"
@@ -55,6 +56,12 @@ templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch d
 							>
 								Stop watching
 							</a>
+							<a
+								href={ templ.URL(fmt.Sprintf("/artist-watches/%s", artist.MBzID)) }
+								class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+							>
+								Watch settings
+							</a>
 						} else {
 							<a
 								href={ templ.URL(fmt.Sprintf("%s/watch", artist.UIPath())) }
@@ -87,7 +94,7 @@ templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch d
 		}
 		{{ rgGroups := groupReleaseGroups(pastRg) }}
 		for _, group := range rgGroups {
-			@artistReleases(group)
+			@artistReleases(group, watch)
 		}
 		if artist.RefreshedAt != nil {
 			<div class="text-slate-500 italic text-sm">Last refreshed { timeago.English.Format(time.Unix(*artist.RefreshedAt, 0)) }</div>
@@ -110,7 +117,7 @@ templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch d
 	}
 }
 
-templ artistReleases(group groupedReleaseGroups) {
+templ artistReleases(group groupedReleaseGroups, watch database.ArtistWatch) {
 	@releaseListBlock() {
 		<h3 class="text-xl font-bold mb-4">
 			{ group.PrimaryType }
@@ -125,7 +132,7 @@ templ artistReleases(group groupedReleaseGroups) {
 		</h3>
 		for _, rg := range group.ReleaseGroups {
 			@releaseInfo(rg) {
-				@releaseStatus(rg)
+				@releaseStatus(rg, watch)
 			}
 		}
 	}
@@ -163,28 +170,33 @@ templ releaseInfo(rg database.ReleaseGroup) {
 		<div class="col-span-2 flex justify-center break-all">
 			{ rg.ReleaseDate }
 		</div>
-		<div class="col-span-2 flex justify-end">
+		<div class="col-span-2 flex justify-center">
 			{ children... }
 		</div>
 	</div>
 }
 
-templ releaseStatus(rg database.ReleaseGroup) {
+templ releaseStatus(rg database.ReleaseGroup, watch database.ArtistWatch) {
+	{{ watched := watch.Watches(rg) }}
 	switch rg.LibraryStatus {
 		case database.LibraryStatusMissing:
-			@BubbleOrDot("red") {
-				Missing
+			@BubbleOrDot(lo.Ternary(watched, "red", "gray")) {
+				if watched {
+					Missing
+				} else {
+					Absent
+				}
 			}
 		case database.LibraryStatusPresent:
-			@BubbleOrDot("green") {
+			@BubbleOrDot(lo.Ternary(watched, "green", "gray")) {
 				Present
 			}
 		case database.LibraryStatusSongsPresent:
-			@BubbleOrDot("cyan") {
+			@BubbleOrDot(lo.Ternary(watched, "cyan", "gray")) {
 				Songs present
 			}
 		default:
-			@BubbleOrDot("yellow") {
+			@BubbleOrDot(lo.Ternary(watched, "yellow", "gray")) {
 				Unknown
 			}
 	}
@@ -203,29 +215,30 @@ templ artistsMenu(artists []database.ArtistWithStats) {
 				<div
 					class="flex items-center rounded-full text-xs font-semibold overflow-hidden"
 				>
-					if artist.Upcoming > 0 {
-						<span title="Upcoming" class="inline-flex items-center gap-2 bg-pink-400/20 px-3 py-1 text-pink-300">
-							<span class="relative flex h-2 w-2">
-								<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75"></span>
-								<span class="relative inline-flex h-2 w-2 rounded-full bg-pink-400"></span>
-							</span>
-							{ artist.Upcoming }
-						</span>
-					}
-					if artist.Present > 0 {
-						<span title="Present" class="relative px-3 py-1 text-green-400 bg-green-400/20">
-							{ artist.Present }
-						</span>
-					}
-					if artist.Missing > 0 {
-						<span title="Missing" class="relative px-3 py-1 text-red-400 bg-red-400/20">
-							{ artist.Missing }
-						</span>
-					}
 					if artist.RefreshedAt == nil {
 						<span title="Unknown" class="relative px-3 py-1 text-yellow-400 bg-yellow-400/20">
 							?
 						</span>
+					} else {
+						if artist.Upcoming > 0 {
+							<span title="Upcoming" class="inline-flex items-center gap-2 bg-pink-400/20 px-3 py-1 text-pink-300">
+								<span class="relative flex h-2 w-2">
+									<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75"></span>
+									<span class="relative inline-flex h-2 w-2 rounded-full bg-pink-400"></span>
+								</span>
+								{ artist.Upcoming }
+							</span>
+						}
+						if artist.Present > 0 {
+							<span title="Present" class="relative px-3 py-1 text-green-400 bg-green-400/20">
+								{ artist.Present }
+							</span>
+						}
+						if artist.Missing > 0 {
+							<span title="Missing" class="relative px-3 py-1 text-red-400 bg-red-400/20">
+								{ artist.Missing }
+							</span>
+						}
 					}
 				</div>
 			}

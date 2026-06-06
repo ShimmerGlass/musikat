@@ -86,7 +86,7 @@ func (t *RefreshArtistReleases) runArtist(ctx context.Context, artist database.A
 			r := o.TakeOr(rg)
 			r.Name = rg.Name
 			r.PrimaryType = rg.PrimaryType
-			r.SecondaryType = rg.SecondaryType
+			r.XXSecondaryTypes = rg.XXSecondaryTypes
 			r.ReleaseDate = rg.ReleaseDate
 
 			return r

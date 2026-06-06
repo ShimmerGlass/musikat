@@ -35,7 +35,7 @@ func (s *Server) artist(ctx context.Context, rw http.ResponseWriter, r *http.Req
 	return component.Artist(artists, artist, watch, rgs).Render(ctx, rw)
 }
 
-func (s *Server) artistWatch(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
+func (s *Server) watchArtist(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
 	artistID := r.PathValue("mbid")
 	watch, _, err := s.db.ArtistWatch(ctx, user.ID, artistID)
 	if err != nil {
@@ -57,7 +57,7 @@ func (s *Server) artistWatch(ctx context.Context, rw http.ResponseWriter, r *htt
 	return nil
 }
 
-func (s *Server) artistStopWatch(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
+func (s *Server) stopWatchArtist(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
 	artistID := r.PathValue("mbid")
 	watch, _, err := s.db.ArtistWatch(ctx, user.ID, artistID)
 	if err != nil {

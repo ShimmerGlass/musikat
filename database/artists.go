@@ -189,10 +189,19 @@ func (d *DB) UserWatchedArtistsWithStats(ctx context.Context, user User) ([]Arti
 
 	res := []ArtistWithStats{}
 	for _, artist := range artists {
+		watch, _, err := d.ArtistWatch(ctx, user.ID, artist.MBzID)
+		if err != nil {
+			return nil, err
+		}
+
 		rgs, err := d.ArtistReleaseGroups(ctx, artist)
 		if err != nil {
 			return nil, err
 		}
+
+		rgs = lo.Filter(rgs, func(rg ReleaseGroup, _ int) bool {
+			return watch.Watches(rg)
+		})
 
 		present := lo.CountBy(rgs, func(rg ReleaseGroup) bool { return rg.LibraryStatus == LibraryStatusPresent })
 		missing := lo.CountBy(rgs, func(rg ReleaseGroup) bool {

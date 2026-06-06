@@ -150,18 +150,20 @@ templ releaseInfo(rg database.ReleaseGroup) {
 				</a>
 			</div>
 		</div>
-		<div class="col-span-4 text-sm text-gray-400">
-			for i, artist := range rg.Artists {
-				if i > 0 {
-					,
+		<div class="col-span-4 text-sm text-gray-400 flex justify-center">
+			<span>
+				for i, artist := range rg.Artists {
+					if i > 0 {
+						,
+					}
+					<a href={ templ.URL(artist.UIPath()) } class="underline text-gray-600">{ artist.Name }</a>
 				}
-				<a href={ templ.URL(artist.UIPath()) } class="underline text-gray-600">{ artist.Name }</a>
-			}
+			</span>
 		</div>
-		<div class="col-span-2 flex justify-center">
+		<div class="col-span-2 flex justify-center break-all">
 			{ rg.ReleaseDate }
 		</div>
-		<div class="col-span-2 flex justify-center">
+		<div class="col-span-2 flex justify-end">
 			{ children... }
 		</div>
 	</div>
@@ -170,19 +172,19 @@ templ releaseInfo(rg database.ReleaseGroup) {
 templ releaseStatus(rg database.ReleaseGroup) {
 	switch rg.LibraryStatus {
 		case database.LibraryStatusMissing:
-			@Bubble("red") {
+			@BubbleOrDot("red") {
 				Missing
 			}
 		case database.LibraryStatusPresent:
-			@Bubble("green") {
+			@BubbleOrDot("green") {
 				Present
 			}
 		case database.LibraryStatusSongsPresent:
-			@Bubble("cyan") {
+			@BubbleOrDot("cyan") {
 				Songs present
 			}
 		default:
-			@Bubble("yellow") {
+			@BubbleOrDot("yellow") {
 				Unknown
 			}
 	}

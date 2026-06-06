@@ -7,3 +7,20 @@ templ Bubble(color string) {
 		{ children... }
 	</span>
 }
+
+templ BubbleOrDot(color string) {
+	@Bubble(color) {
+		@OrDot(color) {
+			{ children... }
+		}
+	}
+}
+
+templ OrDot(color string) {
+	<span class="flex items-center">
+		<span class={ "h-2 w-2 rounded-full sm:hidden", fmt.Sprintf("bg-%s-400", color) }></span>
+		<span class="hidden sm:inline">
+			{ children... }
+		</span>
+	</span>
+}

@@ -21,56 +21,44 @@ templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch d
 				@ArtistRefreshButton(artist)
 				<div class="relative inline-block text-left">
 					<!-- Dropdown Button -->
-					<button
-						id="watch-button"
-						class="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-white text-sm hover:bg-gray-600"
-					>
+					@Button(BtnCfg{ID: "watch-button"}) {
 						if watch.Status {
 							Watching
 						} else {
 							Not watching
 						}
-						<svg
-							class="h-4 w-4"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M19 9l-7 7-7-7"
-							></path>
-						</svg>
-					</button>
+						@IconArrowDown()
+					}
 					<!-- Dropdown Menu -->
-					<div
-						id="watch-menu"
-						class="absolute right-0 mt-2 hidden w-48 rounded-lg bg-white shadow-lg ring-1 ring-black/5"
-					>
+					@DropdownMenu("watch-menu") {
 						if watch.Status {
-							<a
-								href={ templ.URL(fmt.Sprintf("%s/stop-watch", artist.UIPath())) }
-								class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-							>
-								Stop watching
-							</a>
-							<a
-								href={ templ.URL(fmt.Sprintf("/artist-watches/%s", artist.MBzID)) }
-								class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-							>
-								Watch settings
-							</a>
+							<div class="py-2 border-b border-gray-100">
+								<a
+									href={ templ.URL(fmt.Sprintf("%s/stop-watch", artist.UIPath())) }
+									class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+								>
+									Stop watching
+								</a>
+							</div>
+							<div class="py-2">
+								<a
+									href={ templ.URL(fmt.Sprintf("/artist-watches/%s", artist.MBzID)) }
+									class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+								>
+									Watch settings
+								</a>
+							</div>
 						} else {
-							<a
-								href={ templ.URL(fmt.Sprintf("%s/watch", artist.UIPath())) }
-								class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-							>
-								Watch
-							</a>
+							<div class="py-2">
+								<a
+									href={ templ.URL(fmt.Sprintf("%s/watch", artist.UIPath())) }
+									class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+								>
+									Watch
+								</a>
+							</div>
 						}
-					</div>
+					}
 				</div>
 			</div>
 		</h2>

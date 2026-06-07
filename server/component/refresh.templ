@@ -13,11 +13,7 @@ templ ArtistRefreshButton(artist database.Artist) {
 templ refreshButton(artistID string) {
 	<form action="/refresh">
 		{{ refreshRunning := RefreshRunningFromCtx(ctx) }}
-		<button
-			type="submit"
-			disabled?={ refreshRunning }
-			class="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50"
-		>
+		@Button(BtnCfg{Type: "submit", Disabled: refreshRunning}) {
 			if refreshRunning {
 				@Spinner()
 				Refreshing
@@ -27,7 +23,7 @@ templ refreshButton(artistID string) {
 					all
 				}
 			}
-		</button>
+		}
 		<input type="hidden" name="next" value={ URLFromCtx(ctx) }/>
 		if artistID != "" {
 			<input type="hidden" name="artist" value={ artistID }/>

@@ -1,6 +1,5 @@
 package component
 
-import "strings"
 import "github.com/shimmerglass/musikat/version"
 
 templ Layout(title string, menu templ.Component) {
@@ -55,17 +54,14 @@ templ Layout(title string, menu templ.Component) {
 						</div>
 						<div class="relative">
 							<!-- Trigger -->
-							<button
-								onclick="toggleUserMenu()"
-								class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white hover:bg-black"
-							>
-								{ strings.ToUpper( user.Name[:1]) }
-							</button>
-							<!-- Dropdown -->
 							<div
-								id="user-menu"
-								class="absolute right-0 mt-2 hidden w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+								class="cursor-pointer"
+								onclick="toggleUserMenu()"
 							>
+								@IconUser(user)
+							</div>
+							<!-- Dropdown -->
+							@DropdownMenu("user-menu") {
 								<div class="border-b border-gray-100 px-4 py-3">
 									<div class="font-medium text-gray-900">
 										{ user.Name }
@@ -90,7 +86,7 @@ templ Layout(title string, menu templ.Component) {
 										Sign Out
 									</a>
 								</div>
-							</div>
+							}
 						</div>
 					</div>
 				</header>

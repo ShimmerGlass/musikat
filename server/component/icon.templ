@@ -1,5 +1,10 @@
 package component
 
+import (
+	"github.com/shimmerglass/musikat/database"
+	"strings"
+)
+
 templ IconMusicBrains() {
 	<svg enable-background="new 0 0 27 30" height="30" viewBox="0 0 30 30" width="30" xmlns="http://www.w3.org/2000/svg" class="inline">
 		<g transform="translate(1.5)">
@@ -11,7 +16,7 @@ templ IconMusicBrains() {
 
 templ Spinner() {
 	<svg
-		class="h-4 w-4 animate-spin"
+		class="h-3 w-3 animate-spin"
 		xmlns="http://www.w3.org/2000/svg"
 		fill="none"
 		viewBox="0 0 24 24"
@@ -46,4 +51,26 @@ templ IconBurger() {
 			d="M4 6h16M4 12h16M4 18h16"
 		></path>
 	</svg>
+}
+
+templ IconArrowDown() {
+	<svg
+		class="h-4 w-4"
+		fill="none"
+		stroke="currentColor"
+		viewBox="0 0 24 24"
+	>
+		<path
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			stroke-width="2"
+			d="M19 9l-7 7-7-7"
+		></path>
+	</svg>
+}
+
+templ IconUser(user database.User) {
+	<div class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white">
+		{ strings.ToUpper(user.Name[:1]) }
+	</div>
 }

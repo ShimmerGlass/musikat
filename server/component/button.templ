@@ -1,0 +1,63 @@
+package component
+
+import "fmt"
+import "strings"
+import "github.com/samber/lo"
+
+type BtnCfg struct {
+	Href     string
+	ID       string
+	Type     string
+	Disabled bool
+	Color    string
+}
+
+templ Button(cfg BtnCfg) {
+	{{
+		color, _ := lo.Coalesce(cfg.Color, "gray")
+		classes := strings.Join([]string{
+			"inline-flex",
+			"items-center",
+			"gap-2",
+			"rounded-lg",
+			"px-3",
+			"py-2",
+			"text-sm",
+			"font-medium",
+			"text-white",
+			"transition",
+			"disabled:cursor-not-allowed",
+			fmt.Sprintf("bg-%s-900", color),
+			fmt.Sprintf("disabled:bg-%s-400", color),
+			fmt.Sprintf("hover:bg-%s-600", color),
+		}, " ")
+	}}
+	if cfg.Href != "" {
+		<a
+			href={ cfg.Href }
+			type={ cfg.Type }
+			disabled?={ cfg.Disabled }
+			class={ classes }
+		>
+			{ children... }
+		</a>
+	} else {
+		<button
+			id={ cfg.ID }
+			type={ cfg.Type }
+			disabled?={ cfg.Disabled }
+			class={ classes }
+		>
+			{ children... }
+		</button>
+	}
+}
+
+templ DropdownMenu(id string) {
+	<div
+		id={ id }
+		class="absolute right-0 mt-2 hidden w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg z-1000"
+	>
+		{ children... }
+	</div>
+}

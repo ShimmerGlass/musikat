@@ -58,12 +58,9 @@ templ Account() {
 							/>
 						</div>
 						<div class="flex justify-end">
-							<button
-								type="submit"
-								class="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
-							>
+							@Button(BtnCfg{Type: "submit"}) {
 								Save Basic Info
-							</button>
+							}
 						</div>
 						<input name="type" value="info" type="hidden"/>
 					</form>
@@ -102,12 +99,9 @@ templ Account() {
 							/>
 						</div>
 						<div class="flex justify-end">
-							<button
-								type="submit"
-								class="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
-							>
+							@Button(BtnCfg{Type: "submit"}) {
 								Change Password
-							</button>
+							}
 						</div>
 						<input name="type" value="password" type="hidden"/>
 					</form>
@@ -140,12 +134,9 @@ templ Account() {
 							/>
 						</div>
 						<div class="flex justify-end">
-							<button
-								type="submit"
-								class="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
-							>
+							@Button(BtnCfg{Type: "submit"}) {
 								Save Subsonic Settings
-							</button>
+							}
 						</div>
 						<input name="type" value="subsonic" type="hidden"/>
 					</form>
@@ -165,12 +156,9 @@ templ Account() {
 							/>
 						</div>
 						<div class="flex justify-end">
-							<button
-								type="submit"
-								class="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
-							>
+							@Button(BtnCfg{Type: "submit"}) {
 								Save XMPP Settings
-							</button>
+							}
 						</div>
 						<input name="type" value="notifications" type="hidden"/>
 					</form>

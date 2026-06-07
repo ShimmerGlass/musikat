@@ -1,7 +1,6 @@
 package component
 
 import "github.com/shimmerglass/musikat/database"
-import "strings"
 
 templ Users(users []database.User) {
 	@Layout("Users", adminMenu()) {
@@ -16,12 +15,9 @@ templ Users(users []database.User) {
 						Manage application users and access.
 					</p>
 				</div>
-				<a
-					href="/admin/users/create"
-					class="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
-				>
+				@Button(BtnCfg{Href: "/admin/users/create"}) {
 					Add User
-				</a>
+				}
 			</div>
 			<!-- Table -->
 			<div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -44,9 +40,7 @@ templ Users(users []database.User) {
 				for _, user := range users {
 					<div class="grid grid-cols-12 items-center border-b border-gray-100 px-6 py-4 hover:bg-gray-50">
 						<div class="col-span-4 flex items-center gap-4">
-							<div class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white">
-								{ strings.ToUpper(user.Name[:1]) }
-							</div>
+							@IconUser(user)
 							<div>
 								<div class="font-medium text-gray-900">
 									{ user.Name }
@@ -60,17 +54,15 @@ templ Users(users []database.User) {
 							{ user.SubsonicUser }
 						</div>
 						<div class="col-span-2">
-							<span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+							@Bubble("blue") {
 								Admin
-							</span>
+							}
 						</div>
 						<div class="col-span-2 flex justify-end gap-2">
 							<form action="/admin/users/delete" method="post">
-								<button
-									class="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
-								>
+								@Button(BtnCfg{Color: "red"}) {
 									Delete
-								</button>
+								}
 								<input type="hidden" name="user_id" value={ user.ID }/>
 							</form>
 						</div>

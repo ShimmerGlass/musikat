@@ -22,7 +22,7 @@ templ Layout(title string, menu templ.Component) {
 						<a href="/">Musikat</a>
 					</h1>
 				</div>
-				<nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+				<nav class="flex-1 px-4 py-6 space-y-2 min-h-0">
 					@menu
 				</nav>
 				<footer class="mt-auto border-t border-gray-800 px-4 py-4">
@@ -128,6 +128,16 @@ templ Layout(title string, menu templ.Component) {
 
 				if (!event.target.closest('.relative')) {
 					menu.classList.add('hidden');
+				}
+			});
+
+			window.addEventListener("load", () => {
+				const active = document.getElementById("menu-active");
+
+				if (active) {
+					active.scrollIntoView({
+						block: "center"
+					});
 				}
 			});
 		</script>

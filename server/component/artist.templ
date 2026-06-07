@@ -194,47 +194,51 @@ templ releaseStatus(rg database.ReleaseGroup, watch database.ArtistWatch) {
 }
 
 templ artistsMenu(artists []database.ArtistWithStats) {
-	<input
-		id="artist-search"
-		type="text"
-		placeholder="Search artists..."
-		class="mb-2 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
-	/>
-	for _, artist := range artists {
-		<div class="artist-item" data-name={ artist.Name }>
-			@menuItem(artist.Name, fmt.Sprintf("/artists/%s", artist.MBzID)) {
-				<div
-					class="flex items-center rounded-full text-xs font-semibold overflow-hidden"
-				>
-					if artist.RefreshedAt == nil {
-						<span title="Unknown" class="relative px-3 py-1 text-yellow-400 bg-yellow-400/20">
-							?
-						</span>
-					} else {
-						if artist.Upcoming > 0 {
-							<span title="Upcoming" class="inline-flex items-center gap-2 bg-pink-400/20 px-3 py-1 text-pink-300">
-								<span class="relative flex h-2 w-2">
-									<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75"></span>
-									<span class="relative inline-flex h-2 w-2 rounded-full bg-pink-400"></span>
+	<div class="flex flex-col h-full min-h-0">
+		<input
+			id="artist-search"
+			type="text"
+			placeholder="Search artists..."
+			class="mb-2 w-full shrink-0 rounded-md border border-zinc-700 focus:border-zinc-500 bg-zinc-900 px-3 py-2 text-sm outline-none focus:outline-none"
+		/>
+		<div class="overflow-y-auto min-h-0 flex-1">
+			for _, artist := range artists {
+				<div class="artist-item" data-name={ artist.Name }>
+					@menuItem(artist.Name, fmt.Sprintf("/artists/%s", artist.MBzID)) {
+						<div
+							class="flex items-center rounded-full text-xs font-semibold overflow-hidden"
+						>
+							if artist.RefreshedAt == nil {
+								<span title="Unknown" class="relative px-3 py-1 text-yellow-400 bg-yellow-400/20">
+									?
 								</span>
-								{ artist.Upcoming }
-							</span>
-						}
-						if artist.Present > 0 {
-							<span title="Present" class="relative px-3 py-1 text-green-400 bg-green-400/20">
-								{ artist.Present }
-							</span>
-						}
-						if artist.Missing > 0 {
-							<span title="Missing" class="relative px-3 py-1 text-red-400 bg-red-400/20">
-								{ artist.Missing }
-							</span>
-						}
+							} else {
+								if artist.Upcoming > 0 {
+									<span title="Upcoming" class="inline-flex items-center gap-2 bg-pink-400/20 px-3 py-1 text-pink-300">
+										<span class="relative flex h-2 w-2">
+											<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75"></span>
+											<span class="relative inline-flex h-2 w-2 rounded-full bg-pink-400"></span>
+										</span>
+										{ artist.Upcoming }
+									</span>
+								}
+								if artist.Present > 0 {
+									<span title="Present" class="relative px-3 py-1 text-green-400 bg-green-400/20">
+										{ artist.Present }
+									</span>
+								}
+								if artist.Missing > 0 {
+									<span title="Missing" class="relative px-3 py-1 text-red-400 bg-red-400/20">
+										{ artist.Missing }
+									</span>
+								}
+							}
+						</div>
 					}
 				</div>
 			}
 		</div>
-	}
+	</div>
 	<script>
 		function normalizeText(text) {
 			return text
@@ -243,15 +247,17 @@ templ artistsMenu(artists []database.ArtistWithStats) {
 				.replace(/[\u0300-\u036f]/g, "");
 		}
 
-		document
-			.getElementById("artist-search")
-			.addEventListener("input", function () {
-				const query = normalizeText(this.value);
+		const artistsSearch = document.getElementById("artist-search");
 
-				document.querySelectorAll(".artist-item").forEach((item) => {
-					const name = normalizeText(item.dataset.name);
-					item.style.display = name.includes(query) ? "" : "none";
-				});
+		function filterArtists() {
+			query = normalizeText(artistsSearch.value);
+			document.querySelectorAll(".artist-item").forEach((item) => {
+				const name = normalizeText(item.dataset.name);
+				item.style.display = name.includes(query) ? "" : "none";
 			});
+		}
+
+		artistsSearch.addEventListener("input", filterArtists);
+		filterArtists()
 	</script>
 }

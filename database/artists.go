@@ -152,6 +152,7 @@ func (d *DB) UserWatchedArtists(ctx context.Context, user User) ([]Artist, error
 			"user_id": user.ID,
 			"status":  1,
 		}).
+		Order(goqu.I("name").Asc()).
 		Executor().ScannerContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list watched artists: select: %w", err)

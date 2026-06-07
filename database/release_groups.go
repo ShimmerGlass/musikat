@@ -47,6 +47,11 @@ func (r ReleaseGroup) SecondaryTypes() []string {
 	return strings.Split(r.XXSecondaryTypes, ",")
 }
 
+func (r ReleaseGroup) Year() string {
+	year, _, _ := strings.Cut(r.ReleaseDate, "-")
+	return year
+}
+
 func (r ReleaseGroup) MBzURL() string {
 	return fmt.Sprintf("https://musicbrainz.org/release-group/%s", r.MBzID)
 }

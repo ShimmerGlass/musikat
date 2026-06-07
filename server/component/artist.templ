@@ -140,7 +140,7 @@ templ artistReleases(group groupedReleaseGroups, watch database.ArtistWatch) {
 
 templ releaseListBlock() {
 	<div
-		class="px-6 py-4 mb-4 transition bg-gray-50 rounded-md"
+		class="px-6 py-4 mb-4 -mx-4 transition bg-gray-50 rounded-md"
 	>
 		{ children... }
 	</div>
@@ -150,27 +150,30 @@ templ releaseInfo(rg database.ReleaseGroup) {
 	<div
 		class="grid grid-cols-12 items-center [&:not(:last-child)]:border-b border-gray-200 py-3 text-sm font-semibold text-gray-600"
 	>
-		<div class="col-span-4">
-			<div class="font-medium text-gray-900">
+		<div class="col-span-5 sm:col-span-4">
+			<div class="font-medium text-gray-900 wrap-break-word">
 				<a href={ templ.URL(rg.MBzURL()) } class="underline">
 					{ rg.Name }
 				</a>
 			</div>
 		</div>
-		<div class="col-span-4 text-sm text-gray-400 flex justify-center">
-			<span>
-				for i, artist := range rg.Artists {
-					if i > 0 {
-						,
-					}
-					<a href={ templ.URL(artist.UIPath()) } class="underline text-gray-600">{ artist.Name }</a>
+		<div class="col-span-4 text-sm text-gray-400 text-center wrap-break-word">
+			for i, artist := range rg.Artists {
+				if i > 0 {
+					,
 				}
+				<a href={ templ.URL(artist.UIPath()) } class="underline text-gray-600">{ artist.Name }</a>
+			}
+		</div>
+		<div class="col-span-2 text-center wrap-break-word">
+			<span class="hidden sm:inline">
+				{ rg.ReleaseDate }
+			</span>
+			<span class="sm:hidden">
+				{ rg.Year() }
 			</span>
 		</div>
-		<div class="col-span-2 flex justify-center break-all">
-			{ rg.ReleaseDate }
-		</div>
-		<div class="col-span-2 flex justify-center">
+		<div class="col-span-1 sm:col-span-2 flex justify-center">
 			{ children... }
 		</div>
 	</div>

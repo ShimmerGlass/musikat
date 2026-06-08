@@ -1,5 +1,8 @@
 FROM golang:1.26-trixie AS build
 
+ARG VERSION
+ENV VERSION=$VERSION
+
 RUN mkdir /app
 COPY . /app
 WORKDIR /app

@@ -53,11 +53,16 @@ func (s *Server) loginHandler(ctx context.Context, rw http.ResponseWriter, r *ht
 		return err
 	}
 
+	var expire time.Time
+	if r.Form.Get("remember") == "on" {
+		expire = now.Add(24 * 30 * time.Hour)
+	}
+
 	http.SetCookie(rw, &http.Cookie{
 		Name:     authCookie,
 		Value:    tokenString,
 		Path:     "/",
-		Expires:  now.Add(48 * time.Hour),
+		Expires:  expire,
 		HttpOnly: true,
 	})
 
@@ -75,7 +80,7 @@ func (s *Server) logout(ctx context.Context, rw http.ResponseWriter, r *http.Req
 		Name:     authCookie,
 		Value:    "",
 		Path:     "/",
-		Expires:  time.Time{},
+		Expires:  time.Now().Add(-time.Hour),
 		HttpOnly: true,
 	})
 

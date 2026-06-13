@@ -137,6 +137,40 @@ func (d *DB) ReleaseGroup(ctx context.Context, mbzID string) (ReleaseGroup, erro
 	return rg, nil
 }
 
+func (d *DB) DeleteReleaseGroup(ctx context.Context, mbzID string) error {
+	_, err := d.gq.
+		Delete(tableReleaseGroupArtists).
+		Where(goqu.Ex{
+			"release_group_mb_id": mbzID,
+		}).
+		Executor().ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("delete release group artists: %w", err)
+	}
+
+	_, err = d.gq.
+		Delete(tableReleaseGroupNotifications).
+		Where(
+			goqu.C("release_group_mb_id").Eq(mbzID),
+		).
+		Executor().ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("delete release group notifications: %w", err)
+	}
+
+	_, err = d.gq.
+		Delete(tableReleaseGroups).
+		Where(goqu.Ex{
+			"mb_id": mbzID,
+		}).
+		Executor().ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("delete release group: %w", err)
+	}
+
+	return nil
+}
+
 func (d *DB) ReplaceReleaseGroupArtists(ctx context.Context, rg ReleaseGroup) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()

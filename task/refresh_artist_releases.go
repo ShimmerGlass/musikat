@@ -30,16 +30,8 @@ func (t *RefreshArtistReleases) Run(ctx context.Context) error {
 		return err
 	}
 
-	existing, err := t.db.ReleaseGroups(ctx)
-	if err != nil {
-		return err
-	}
-	existingMap := lo.SliceToMap(existing, func(rg database.ReleaseGroup) (string, database.ReleaseGroup) {
-		return rg.MBzID, rg
-	})
-
 	for _, artist := range artists {
-		err := t.runArtist(ctx, artist, existingMap)
+		err := t.RunArtist(ctx, artist)
 		if err != nil {
 			return err
 		}
@@ -49,30 +41,19 @@ func (t *RefreshArtistReleases) Run(ctx context.Context) error {
 }
 
 func (t *RefreshArtistReleases) RunArtist(ctx context.Context, artist database.Artist) error {
-	existing, err := t.db.ReleaseGroups(ctx)
-	if err != nil {
-		return err
-	}
-	existingMap := lo.SliceToMap(existing, func(rg database.ReleaseGroup) (string, database.ReleaseGroup) {
-		return rg.MBzID, rg
-	})
-
-	return t.runArtist(ctx, artist, existingMap)
-}
-
-func (t *RefreshArtistReleases) runArtist(ctx context.Context, artist database.Artist, existingMap map[string]database.ReleaseGroup) error {
 	slog.Info("refreshing artist releases", "artist", artist.Name)
 
-	rgs, err := t.mbz.ArtistReleaseGroups(ctx, artist.MBzID)
+	existingRGs, err := t.db.ArtistReleaseGroups(ctx, artist)
 	if err != nil {
 		return err
 	}
-	rgs = lo.Map(rgs, func(rg database.ReleaseGroup, _ int) database.ReleaseGroup {
-		rg.LibraryStatus = existingMap[rg.MBzID].LibraryStatus
-		return rg
-	})
 
-	for _, rg := range rgs {
+	newRGs, err := t.mbz.ArtistReleaseGroups(ctx, artist.MBzID)
+	if err != nil {
+		return err
+	}
+
+	for _, rg := range newRGs {
 		for _, rgArtist := range rg.Artists {
 			err := t.db.PutArtist(ctx, rgArtist.MBzID, func(o opt.Option[database.Artist]) database.Artist {
 				return o.TakeOr(rgArtist)
@@ -99,6 +80,19 @@ func (t *RefreshArtistReleases) runArtist(ctx context.Context, artist database.A
 		if err != nil {
 			return err
 		}
+	}
+
+	newIDs := lo.SliceToMap(newRGs, func(rg database.ReleaseGroup) (string, bool) {
+		return rg.MBzID, true
+	})
+
+	for _, existingRG := range existingRGs {
+		if newIDs[existingRG.MBzID] {
+			continue
+		}
+
+		slog.Info("deleting release group removed from musicbrainz", "name", existingRG.Name, "id", existingRG.MBzID)
+		t.db.DeleteReleaseGroup(ctx, existingRG.MBzID)
 	}
 
 	return nil

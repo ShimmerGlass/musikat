@@ -171,24 +171,32 @@ templ releaseStatus(rg database.ReleaseGroup, watch database.ArtistWatch) {
 	{{ watched := watch.Watches(rg) }}
 	switch rg.LibraryStatus {
 		case database.LibraryStatusMissing:
-			@BubbleOrDot(lo.Ternary(watched, "red", "gray")) {
-				if watched {
-					Missing
-				} else {
-					Absent
+			@Tooltip("Release is missing from library") {
+				@BubbleOrDot(lo.Ternary(watched, "red", "gray")) {
+					if watched {
+						Missing
+					} else {
+						Absent
+					}
 				}
 			}
 		case database.LibraryStatusPresent:
-			@BubbleOrDot(lo.Ternary(watched, "green", "gray")) {
-				Present
+			@Tooltip("Release is in library") {
+				@BubbleOrDot(lo.Ternary(watched, "green", "gray")) {
+					Present
+				}
 			}
 		case database.LibraryStatusSongsPresent:
-			@BubbleOrDot(lo.Ternary(watched, "cyan", "gray")) {
-				Songs present
+			@Tooltip("Songs from release are present through other releases") {
+				@BubbleOrDot(lo.Ternary(watched, "cyan", "gray")) {
+					Songs present
+				}
 			}
 		default:
-			@BubbleOrDot(lo.Ternary(watched, "yellow", "gray")) {
-				Unknown
+			@Tooltip("Refresh artist to see status") {
+				@BubbleOrDot(lo.Ternary(watched, "yellow", "gray")) {
+					Unknown
+				}
 			}
 	}
 }

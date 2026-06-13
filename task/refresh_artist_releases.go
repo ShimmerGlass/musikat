@@ -92,7 +92,10 @@ func (t *RefreshArtistReleases) RunArtist(ctx context.Context, artist database.A
 		}
 
 		slog.Info("deleting release group removed from musicbrainz", "name", existingRG.Name, "id", existingRG.MBzID)
-		t.db.DeleteReleaseGroup(ctx, existingRG.MBzID)
+		err := t.db.DeleteReleaseGroup(ctx, existingRG.MBzID)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -138,6 +138,9 @@ func (d *DB) ReleaseGroup(ctx context.Context, mbzID string) (ReleaseGroup, erro
 }
 
 func (d *DB) DeleteReleaseGroup(ctx context.Context, mbzID string) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	_, err := d.gq.
 		Delete(tableReleaseGroupArtists).
 		Where(goqu.Ex{

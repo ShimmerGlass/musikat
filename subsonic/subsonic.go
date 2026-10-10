@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/delucks/go-subsonic"
 	"github.com/shimmerglass/musikat/database"
@@ -30,7 +31,7 @@ func (s *Subsonic) User(user database.User) (*User, error) {
 	}
 
 	client := &subsonic.Client{
-		Client:     &http.Client{},
+		Client:     &http.Client{Timeout: 10 * time.Second},
 		BaseUrl:    s.cfg.URL,
 		User:       user.SubsonicUser,
 		ClientName: "Musikat",

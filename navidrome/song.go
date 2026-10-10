@@ -29,6 +29,8 @@ func (u *User) ArtistSongs(ctx context.Context, artist string) ([]model.MediaFil
 	if err != nil {
 		return nil, fmt.Errorf("navidrome: artist songs: %w", err)
 	}
+	defer func() { _ = res.Body.Close() }()
+
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("navidrome: artist songs: invalid status code %d", res.StatusCode)
 	}

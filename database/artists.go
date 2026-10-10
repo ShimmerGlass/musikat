@@ -189,18 +189,57 @@ func (d *DB) UserWatchedArtistsWithStats(ctx context.Context, user User) ([]Arti
 	now := time.Now()
 
 	res := []ArtistWithStats{}
+	if len(artists) == 0 {
+		return res, nil
+	}
+
+	watchList, err := d.UserArtistWatches(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	watches := make(map[string]ArtistWatch, len(watchList))
+	for _, w := range watchList {
+		watches[w.ArtistMBzID] = w
+	}
+
+	ids := make([]any, 0, len(artists))
+	for _, a := range artists {
+		ids = append(ids, a.MBzID)
+	}
+
+	type row struct {
+		ReleaseGroup
+		ArtistMBzID string `db:"artist_mb_id"`
+	}
+
+	rows := []row{}
+	err = d.gq.
+		Select(
+			goqu.L("release_groups.*"),
+			goqu.T(tableReleaseGroupArtists).Col("artist_mb_id"),
+		).
+		From(tableReleaseGroups).
+		Join(goqu.T(tableReleaseGroupArtists), goqu.On(goqu.I("release_group_mb_id").Eq(goqu.I("mb_id")))).
+		Where(goqu.C("artist_mb_id").In(ids...)).
+		Order(goqu.I("release_date").Desc()).
+		Executor().ScanStructsContext(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("list watched artists release groups: %w", err)
+	}
+
+	byArtist := make(map[string][]ReleaseGroup, len(artists))
+	for _, r := range rows {
+		byArtist[r.ArtistMBzID] = append(byArtist[r.ArtistMBzID], r.ReleaseGroup)
+	}
+
 	for _, artist := range artists {
-		watch, _, err := d.ArtistWatch(ctx, user.ID, artist.MBzID)
-		if err != nil {
-			return nil, err
+		// A missing watch yields a zero-value watch, as ArtistWatch does.
+		watch, ok := watches[artist.MBzID]
+		if !ok {
+			watch = ArtistWatch{UserID: user.ID, ArtistMBzID: artist.MBzID}
 		}
 
-		rgs, err := d.ArtistReleaseGroups(ctx, artist)
-		if err != nil {
-			return nil, err
-		}
-
-		rgs = lo.Filter(rgs, func(rg ReleaseGroup, _ int) bool {
+		rgs := lo.Filter(byArtist[artist.MBzID], func(rg ReleaseGroup, _ int) bool {
 			return watch.Watches(rg)
 		})
 

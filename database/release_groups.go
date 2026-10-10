@@ -36,6 +36,7 @@ type ReleaseGroup struct {
 	ReleaseDate           string        `db:"release_date"`
 	LibraryStatus         LibraryStatus `db:"in_library"`
 	InLibraryReleaseMBzID string        `db:"in_library_release_mb_id"`
+	ReleasesFetchedAt     *int64        `db:"releases_fetched_at"`
 
 	Artists []Artist `db:"-" yaml:"artists"`
 }
@@ -86,6 +87,8 @@ func (d *DB) addReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
+	// releases_fetched_at is deliberately absent from the conflict update: it
+	// is owned by ReplaceReleaseGroupReleases and must survive upserts.
 	_, err := d.gq.Insert(tableReleaseGroups).
 		Rows(rg).
 		OnConflict(goqu.DoUpdate("mb_id", goqu.Record{
@@ -141,7 +144,13 @@ func (d *DB) DeleteReleaseGroup(ctx context.Context, mbzID string) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	_, err := d.gq.
+	tx, err := d.gq.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("delete release group: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.
 		Delete(tableReleaseGroupArtists).
 		Where(goqu.Ex{
 			"release_group_mb_id": mbzID,
@@ -151,7 +160,7 @@ func (d *DB) DeleteReleaseGroup(ctx context.Context, mbzID string) error {
 		return fmt.Errorf("delete release group artists: %w", err)
 	}
 
-	_, err = d.gq.
+	_, err = tx.
 		Delete(tableReleaseGroupNotifications).
 		Where(
 			goqu.C("release_group_mb_id").Eq(mbzID),
@@ -161,7 +170,15 @@ func (d *DB) DeleteReleaseGroup(ctx context.Context, mbzID string) error {
 		return fmt.Errorf("delete release group notifications: %w", err)
 	}
 
-	_, err = d.gq.
+	_, err = tx.
+		Delete(tableReleaseGroupReleases).
+		Where(goqu.C("release_group_mb_id").Eq(mbzID)).
+		Executor().ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("delete release group releases: %w", err)
+	}
+
+	_, err = tx.
 		Delete(tableReleaseGroups).
 		Where(goqu.Ex{
 			"mb_id": mbzID,
@@ -171,6 +188,11 @@ func (d *DB) DeleteReleaseGroup(ctx context.Context, mbzID string) error {
 		return fmt.Errorf("delete release group: %w", err)
 	}
 
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("delete release group: commit: %w", err)
+	}
+
 	return nil
 }
 
@@ -178,7 +200,13 @@ func (d *DB) ReplaceReleaseGroupArtists(ctx context.Context, rg ReleaseGroup) er
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	_, err := d.gq.
+	tx, err := d.gq.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("replace release group artists: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.
 		Delete(tableReleaseGroupArtists).
 		Where(goqu.Ex{
 			"release_group_mb_id": rg.MBzID,
@@ -196,13 +224,20 @@ func (d *DB) ReplaceReleaseGroupArtists(ctx context.Context, rg ReleaseGroup) er
 		})
 	}
 
-	_, err = d.gq.
-		Insert(tableReleaseGroupArtists).
-		Rows(recs...).
-		OnConflict(goqu.DoNothing()).
-		Executor().ExecContext(ctx)
+	if len(recs) > 0 {
+		_, err = tx.
+			Insert(tableReleaseGroupArtists).
+			Rows(recs...).
+			OnConflict(goqu.DoNothing()).
+			Executor().ExecContext(ctx)
+		if err != nil {
+			return fmt.Errorf("replace release group artists: %w", err)
+		}
+	}
+
+	err = tx.Commit()
 	if err != nil {
-		return fmt.Errorf("replace release group artists: %w", err)
+		return fmt.Errorf("replace release group artists: commit: %w", err)
 	}
 
 	return nil
@@ -239,36 +274,62 @@ func (d *DB) artistReleaseGroups(ctx context.Context, artist Artist) ([]ReleaseG
 	return res, nil
 }
 
+// ArtistReleaseGroups returns the release groups of an artist, newest first,
+// with their Artists populated.
 func (d *DB) ArtistReleaseGroups(ctx context.Context, artist Artist) ([]ReleaseGroup, error) {
 	rgs, err := d.artistReleaseGroups(ctx, artist)
 	if err != nil {
 		return nil, err
 	}
 
-	for i, rg := range rgs {
-		artists, err := d.releaseGroupArtists(ctx, rg)
-		if err != nil {
-			return nil, err
-		}
+	if len(rgs) == 0 {
+		return rgs, nil
+	}
 
-		rg.Artists = artists
-		rgs[i] = rg
+	ids := make([]any, 0, len(rgs))
+	for _, rg := range rgs {
+		ids = append(ids, rg.MBzID)
+	}
+
+	type row struct {
+		Artist
+		ReleaseGroupMBzID string `db:"release_group_mb_id"`
+	}
+
+	rows := []row{}
+	err = d.gq.
+		Select(
+			goqu.T(tableArtists).Col("mb_id"),
+			goqu.T(tableArtists).Col("name"),
+			goqu.T(tableArtists).Col("refreshed_at"),
+			goqu.T(tableReleaseGroupArtists).Col("release_group_mb_id"),
+		).
+		From(tableArtists).
+		Join(goqu.T(tableReleaseGroupArtists), goqu.On(goqu.I("artist_mb_id").Eq(goqu.I("mb_id")))).
+		Where(goqu.C("release_group_mb_id").In(ids...)).
+		Executor().ScanStructsContext(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("list release groups artists: %w", err)
+	}
+
+	byRG := make(map[string][]Artist, len(rgs))
+	for _, r := range rows {
+		byRG[r.ReleaseGroupMBzID] = append(byRG[r.ReleaseGroupMBzID], r.Artist)
+	}
+
+	for i := range rgs {
+		artists := byRG[rgs[i].MBzID]
+		if artists == nil {
+			artists = []Artist{}
+		}
+		rgs[i].Artists = artists
 	}
 
 	return rgs, nil
 }
 
-func (d *DB) releaseGroupArtists(ctx context.Context, rg ReleaseGroup) ([]Artist, error) {
-	artists := []Artist{}
-	err := d.gq.
-		Select(fmt.Sprintf("%s.*", tableArtists)).
-		From(tableArtists).
-		Join(goqu.T(tableReleaseGroupArtists), goqu.On(goqu.I("artist_mb_id").Eq(goqu.I("mb_id")))).
-		Where(goqu.C("release_group_mb_id").Eq(rg.MBzID)).
-		Executor().ScanStructsContext(ctx, &artists)
-	if err != nil {
-		return nil, fmt.Errorf("list release groups artists: %w", err)
-	}
-
-	return artists, nil
+// ArtistReleaseGroupsWithoutArtists is like ArtistReleaseGroups but leaves
+// ReleaseGroup.Artists unset, saving a query.
+func (d *DB) ArtistReleaseGroupsWithoutArtists(ctx context.Context, artist Artist) ([]ReleaseGroup, error) {
+	return d.artistReleaseGroups(ctx, artist)
 }

@@ -5,31 +5,10 @@ import (
 	"fmt"
 
 	"github.com/delucks/go-subsonic"
-	"github.com/samber/lo"
 	"github.com/shimmerglass/musikat/database"
 )
 
 var ErrArtistNotFound = fmt.Errorf("artist not found")
-
-func (s *User) ArtistReleases(ctx context.Context, artistID string) ([]string, error) {
-	subArtist, err := s.client.GetArtist(artistID)
-	if err != nil {
-		return nil, err
-	}
-
-	res := []string{}
-
-	for _, album := range subArtist.Album {
-		info, err := s.client.GetAlbumInfo2(album.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		res = append(res, info.MusicBrainzID)
-	}
-
-	return res, nil
-}
 
 func (s *User) ArtistSubsonicID(ctx context.Context, artist database.Artist) (string, error) {
 	search, err := s.client.Search3(artist.Name, map[string]string{
@@ -72,9 +51,16 @@ func (s *User) Artists(ctx context.Context) ([]database.Artist, error) {
 		return nil, err
 	}
 
-	return lo.FlatMapErr(artists.Index, func(index *subsonic.IndexID3, _ int) ([]database.Artist, error) {
-		return lo.MapErr(index.Artist, func(artist *subsonic.ArtistID3, _ int) (database.Artist, error) {
-			return s.artist(ctx, artist)
-		})
+	var all []*subsonic.ArtistID3
+	for _, index := range artists.Index {
+		all = append(all, index.Artist...)
+	}
+
+	return s.artists(ctx, all)
+}
+
+func (s *User) artists(ctx context.Context, in []*subsonic.ArtistID3) ([]database.Artist, error) {
+	return mapConcurrent(in, maxConcurrency, func(a *subsonic.ArtistID3) (database.Artist, error) {
+		return s.artist(ctx, a)
 	})
 }

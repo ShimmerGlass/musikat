@@ -44,3 +44,24 @@ func (d *DB) HasReleaseGroupNotification(ctx context.Context, rgID, userID strin
 
 	return count > 0, nil
 }
+
+// NotifiedReleaseGroupIDs returns the set of release group MBIDs the user has
+// already been notified about.
+func (d *DB) NotifiedReleaseGroupIDs(ctx context.Context, userID string) (map[string]struct{}, error) {
+	ids := []string{}
+	err := d.gq.
+		Select("release_group_mb_id").
+		From(tableReleaseGroupNotifications).
+		Where(goqu.C("user_id").Eq(userID)).
+		Executor().ScanValsContext(ctx, &ids)
+	if err != nil {
+		return nil, fmt.Errorf("notified release groups: %w", err)
+	}
+
+	res := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		res[id] = struct{}{}
+	}
+
+	return res, nil
+}

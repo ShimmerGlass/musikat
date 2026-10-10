@@ -34,6 +34,8 @@ func (c *Client) User(ctx context.Context, user, password string) (*User, error)
 	if err != nil {
 		return nil, fmt.Errorf("navidrome: auth: %w", err)
 	}
+	defer func() { _ = res.Body.Close() }()
+
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("navidrome: auth: invalid status code %d", res.StatusCode)
 	}

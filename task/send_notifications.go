@@ -46,13 +46,20 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 		return err
 	}
 
+	notified, err := t.db.NotifiedReleaseGroupIDs(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+
 	for _, watch := range watches {
 		artist, err := t.db.Artist(ctx, watch.ArtistMBzID)
 		if err != nil {
 			return err
 		}
 
-		rgs, err := t.db.ArtistReleaseGroups(ctx, artist)
+		rgs, err := t.db.ArtistReleaseGroupsWithoutArtists(ctx, artist)
 		if err != nil {
 			return err
 		}
@@ -66,20 +73,16 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 				continue
 			}
 
-			if rg.ReleaseTime().After(time.Now()) {
+			releaseTime := rg.ReleaseTime()
+			if releaseTime.After(now) {
 				continue
 			}
 
-			if rg.ReleaseTime().Before(time.Unix(watch.AddedAt, 0)) {
+			if releaseTime.Before(time.Unix(watch.AddedAt, 0)) {
 				continue
 			}
 
-			ok, err := t.db.HasReleaseGroupNotification(ctx, rg.MBzID, user.ID)
-			if err != nil {
-				return err
-			}
-
-			if ok {
+			if _, ok := notified[rg.MBzID]; ok {
 				continue
 			}
 
@@ -93,6 +96,7 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 			if err != nil {
 				return err
 			}
+			notified[rg.MBzID] = struct{}{}
 		}
 	}
 

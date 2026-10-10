@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"slices"
 	"time"
 
 	"github.com/navidrome/navidrome/model"
@@ -47,8 +46,17 @@ func (t *RefreshInLibrary) Run(ctx context.Context) error {
 		return err
 	}
 
+	if len(watchedArtists) == 0 {
+		return nil
+	}
+
+	sub, navi, err := t.subsonic(ctx)
+	if err != nil {
+		return err
+	}
+
 	for _, artist := range watchedArtists {
-		err := t.RunArtist(ctx, artist)
+		err := t.runArtist(ctx, artist, sub, navi)
 		if err != nil {
 			return err
 		}
@@ -58,12 +66,16 @@ func (t *RefreshInLibrary) Run(ctx context.Context) error {
 }
 
 func (t *RefreshInLibrary) RunArtist(ctx context.Context, artist database.Artist) error {
-	slog.Info("refreshing artist in-library releases", "artist", artist.Name)
-
 	sub, navi, err := t.subsonic(ctx)
 	if err != nil {
 		return err
 	}
+
+	return t.runArtist(ctx, artist, sub, navi)
+}
+
+func (t *RefreshInLibrary) runArtist(ctx context.Context, artist database.Artist, sub *subsonic.User, navi *navidrome.User) error {
+	slog.Info("refreshing artist in-library releases", "artist", artist.Name)
 
 	rgs, err := t.db.ArtistReleaseGroups(ctx, artist)
 	if err != nil {
@@ -78,59 +90,72 @@ func (t *RefreshInLibrary) RunArtist(ctx context.Context, artist database.Artist
 		return err
 	}
 
-	inLibReleases, err := sub.ArtistReleases(ctx, artistID)
-	if err != nil {
-		return err
-	}
-
 	artistSongs, err := navi.ArtistSongs(ctx, artistID)
 	if err != nil {
 		return err
 	}
 
 	artistRecordingIDs := lo.Map(artistSongs, func(song model.MediaFile, _ int) string { return song.MbzRecordingID })
-
-	for _, releaseGroup := range rgs {
-		if releaseGroup.InLibraryReleaseMBzID != "" && slices.Contains(inLibReleases, releaseGroup.InLibraryReleaseMBzID) {
+	rgToAlbums := map[string]map[string]struct{}{}
+	songAlbumIDs := map[string]struct{}{}
+	for _, song := range artistSongs {
+		if song.MbzAlbumID == "" {
 			continue
 		}
-
-		slog.Info("refreshing artist release group in-library releases", "artist", artist.Name, "release_group", releaseGroup.Name)
-
-		releases, err := t.mbz.ReleaseGroupsReleases(ctx, releaseGroup.MBzID)
-		if err != nil {
-			return err
+		songAlbumIDs[song.MbzAlbumID] = struct{}{}
+		if song.MbzReleaseGroupID == "" {
+			continue
 		}
-		releaseIDs := lo.Map(releases, func(rel mbz.Release, _ int) string { return string(rel.ID) })
+		if rgToAlbums[song.MbzReleaseGroupID] == nil {
+			rgToAlbums[song.MbzReleaseGroupID] = map[string]struct{}{}
+		}
+		rgToAlbums[song.MbzReleaseGroupID][song.MbzAlbumID] = struct{}{}
+	}
 
-		inLib := lo.Intersect(inLibReleases, releaseIDs)
-		hasAllSongs := false
+	for _, releaseGroup := range rgs {
+		state, ok := directRelease(releaseGroup, rgToAlbums)
+		if !ok {
+			cached, err := t.db.ReleaseGroupReleases(ctx, releaseGroup.MBzID)
+			if err != nil {
+				return err
+			}
 
-		if len(inLib) == 0 {
-			for _, rel := range releases {
-				relRecordingIDs := lo.FlatMap(rel.Media, func(media mbz.Medium, _ int) []string {
-					return lo.Map(media.Tracks, func(track mbz.Track, _ int) string {
-						return string(track.Recording.ID)
-					})
+			if releasesStale(releaseGroup, time.Now()) {
+				slog.Info("fetching release group releases", "artist", artist.Name, "release_group", releaseGroup.Name)
+
+				releases, err := t.mbz.ReleaseGroupsReleases(ctx, releaseGroup.MBzID)
+				if err != nil {
+					return err
+				}
+
+				cached = lo.Map(releases, func(rel mbz.Release, _ int) database.CachedRelease {
+					return database.CachedRelease{
+						MBzID: string(rel.ID),
+						RecordingIDs: lo.FlatMap(rel.Media, func(media mbz.Medium, _ int) []string {
+							return lo.Map(media.Tracks, func(track mbz.Track, _ int) string {
+								return string(track.Recording.ID)
+							})
+						}),
+					}
 				})
 
-				if lo.Every(artistRecordingIDs, relRecordingIDs) {
-					hasAllSongs = true
-					break
+				err = t.db.ReplaceReleaseGroupReleases(ctx, releaseGroup.MBzID, cached, time.Now())
+				if err != nil {
+					return err
 				}
 			}
+
+			state = cachedState(songAlbumIDs, artistRecordingIDs, cached)
+		}
+
+		if state.Status == releaseGroup.LibraryStatus && state.ReleaseID == releaseGroup.InLibraryReleaseMBzID {
+			continue
 		}
 
 		err = t.db.PutReleaseGroup(ctx, releaseGroup.MBzID, func(o opt.Option[database.ReleaseGroup]) database.ReleaseGroup {
 			rg := o.TakeOr(releaseGroup)
-			if len(inLib) > 0 {
-				rg.LibraryStatus = database.LibraryStatusPresent
-				rg.InLibraryReleaseMBzID = inLib[0]
-			} else if hasAllSongs {
-				rg.LibraryStatus = database.LibraryStatusSongsPresent
-			} else {
-				rg.LibraryStatus = database.LibraryStatusMissing
-			}
+			rg.LibraryStatus = state.Status
+			rg.InLibraryReleaseMBzID = state.ReleaseID
 			return rg
 		})
 		if err != nil {

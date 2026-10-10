@@ -22,20 +22,44 @@ type MusicBrainz struct {
 	coverArtBaseURL string
 }
 
-func New() *MusicBrainz {
+// Option customizes a MusicBrainz client.
+type Option func(*MusicBrainz)
+
+// WithBaseURL sets the MusicBrainz web service base URL.
+func WithBaseURL(url string) Option {
+	return func(m *MusicBrainz) { m.client.SetBaseURL(url) }
+}
+
+// WithCoverArtBaseURL sets the Cover Art Archive base URL.
+func WithCoverArtBaseURL(url string) Option {
+	return func(m *MusicBrainz) { m.coverArtBaseURL = url }
+}
+
+// WithRateLimit sets the minimum interval between MusicBrainz requests.
+func WithRateLimit(interval time.Duration) Option {
+	return func(m *MusicBrainz) { m.tick = time.Tick(interval) }
+}
+
+func New(opts ...Option) *MusicBrainz {
 	mbc := mbz.NewClient(mbz.AppInfo{
 		Name:    "Musikat",
 		Version: "0.0.1",
 		URL:     "https://github.com/ShimmerGlass/musikat",
 	})
 
-	return &MusicBrainz{
+	m := &MusicBrainz{
 		client: mbc,
 		tick:   time.Tick(time.Second),
 
 		coverArtClient:  newCoverArtClient(),
 		coverArtBaseURL: defaultCoverArtBaseURL,
 	}
+
+	for _, opt := range opts {
+		opt(m)
+	}
+
+	return m
 }
 
 func (m *MusicBrainz) ArtistReleaseGroups(ctx context.Context, artistMBzID string) ([]database.ReleaseGroup, error) {

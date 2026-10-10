@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -164,6 +165,8 @@ type fakeMB struct {
 	rgs      map[string][]mbRG      // by artist MBID
 	releases map[string][]mbRelease // by release group MBID
 	requests []string
+	// failArtists makes release group browses of these artist MBIDs fail.
+	failArtists map[string]bool
 	// pageSize, if > 0, caps the number of items per response.
 	pageSize int
 }
@@ -181,12 +184,29 @@ func (f *fakeMB) requestCount() int {
 	return len(f.requests)
 }
 
+// artistRequests counts the requests made for the given artist MBID.
+func (f *fakeMB) artistRequests(id string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, r := range f.requests {
+		if u, err := url.Parse(r); err == nil && u.Query().Get("artist") == id {
+			n++
+		}
+	}
+	return n
+}
+
 func (f *fakeMB) handle(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.requests = append(f.requests, r.URL.String())
 
 	q := r.URL.Query()
+	if f.failArtists[q.Get("artist")] {
+		http.Error(w, "boom", http.StatusBadRequest)
+		return
+	}
 	offset := 0
 	_, _ = fmt.Sscan(q.Get("offset"), &offset)
 	page := func(n int) (int, int) {

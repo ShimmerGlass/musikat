@@ -74,6 +74,27 @@ func (t *RefreshInLibrary) RunArtist(ctx context.Context, artist database.Artist
 	return t.runArtist(ctx, artist, sub, navi)
 }
 
+// ForBatch resolves the Subsonic and Navidrome clients once and returns a
+// task running the in-library refresh of single artists with them.
+func (t *RefreshInLibrary) ForBatch(ctx context.Context) (artistTask, error) {
+	sub, navi, err := t.subsonic(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return batchInLibrary{t: t, sub: sub, navi: navi}, nil
+}
+
+type batchInLibrary struct {
+	t    *RefreshInLibrary
+	sub  *subsonic.User
+	navi *navidrome.User
+}
+
+func (b batchInLibrary) RunArtist(ctx context.Context, artist database.Artist) error {
+	return b.t.runArtist(ctx, artist, b.sub, b.navi)
+}
+
 func (t *RefreshInLibrary) runArtist(ctx context.Context, artist database.Artist, sub *subsonic.User, navi *navidrome.User) error {
 	slog.Info("refreshing artist in-library releases", "artist", artist.Name)
 

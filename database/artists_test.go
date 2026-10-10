@@ -246,3 +246,75 @@ func TestUserWatchedArtistsWithStatsEdgeCases(t *testing.T) {
 		})
 	})
 }
+
+func seedWatch(t *testing.T, ctx context.Context, db *DB, user, artist string, status bool) {
+	require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: user, ArtistMBzID: artist, Status: status}))
+}
+
+func TestDueArtistsAndMarkChecked(t *testing.T) {
+	WithDB(t, func(ctx context.Context, db *DB) {
+		seedUsers(t, ctx, db, "u1", "u2")
+		for _, id := range []string{"a1", "a2", "a3", "a4", "a5", "unwatched", "disabled"} {
+			seedArtist(t, ctx, db, id)
+		}
+		seedWatch(t, ctx, db, "u1", "a1", true)
+		seedWatch(t, ctx, db, "u2", "a1", true) // watched twice, returned once
+		seedWatch(t, ctx, db, "u1", "a2", true)
+		seedWatch(t, ctx, db, "u1", "a3", true)
+		seedWatch(t, ctx, db, "u1", "a4", true)
+		seedWatch(t, ctx, db, "u1", "a5", true)
+		seedWatch(t, ctx, db, "u1", "disabled", false)
+
+		base := time.Unix(1_000_000, 0)
+		require.NoError(t, db.MarkArtistsChecked(ctx, []string{"a3"}, base.Add(-3*time.Hour)))
+		require.NoError(t, db.MarkArtistsChecked(ctx, []string{"a2"}, base.Add(-5*time.Hour)))
+		require.NoError(t, db.MarkArtistsChecked(ctx, []string{"a4"}, base)) // fresh
+		require.NoError(t, db.MarkArtistsChecked(ctx, []string{"a5"}, base.Add(-time.Hour)))
+
+		// never checked first (by id), then oldest first; a4 is not due
+		due, err := db.DueArtists(ctx, base.Add(-30*time.Minute), 10)
+		require.NoError(t, err)
+		require.Equal(t, []string{"a1", "a2", "a3", "a5"}, ids(due))
+
+		due, err = db.DueArtists(ctx, base.Add(-30*time.Minute), 2)
+		require.NoError(t, err)
+		require.Equal(t, []string{"a1", "a2"}, ids(due))
+
+		// strictly older than the threshold
+		due, err = db.DueArtists(ctx, base.Add(-time.Hour), 10)
+		require.NoError(t, err)
+		require.Equal(t, []string{"a1", "a2", "a3"}, ids(due))
+
+		due, err = db.DueArtists(ctx, base, 0)
+		require.NoError(t, err)
+		require.Empty(t, due)
+
+		require.NoError(t, db.MarkArtistsChecked(ctx, nil, base))
+		require.NoError(t, db.MarkArtistsChecked(ctx, []string{"a1", "a2"}, base))
+		got, err := db.Artist(ctx, "a1")
+		require.NoError(t, err)
+		require.Equal(t, base.Unix(), *got.CheckedAt)
+		require.Nil(t, got.RefreshedAt)
+	})
+}
+
+func TestUpsertKeepsCheckedAt(t *testing.T) {
+	WithDB(t, func(ctx context.Context, db *DB) {
+		seedArtist(t, ctx, db, "a1")
+		at := time.Unix(5000, 0)
+		require.NoError(t, db.MarkArtistsChecked(ctx, []string{"a1"}, at))
+
+		// a stale value without checked_at, as written by other tasks
+		require.NoError(t, db.addArtist(ctx, Artist{MBzID: "a1", Name: "Renamed"}))
+		require.NoError(t, db.PutArtist(ctx, "a1", func(opt.Option[Artist]) Artist {
+			return Artist{MBzID: "a1", Name: "Again", RefreshedAt: new(int64(7))}
+		}))
+
+		got, err := db.Artist(ctx, "a1")
+		require.NoError(t, err)
+		require.Equal(t, "Again", got.Name)
+		require.Equal(t, int64(7), *got.RefreshedAt)
+		require.NotNil(t, got.CheckedAt)
+		require.Equal(t, at.Unix(), *got.CheckedAt)
+	})
+}

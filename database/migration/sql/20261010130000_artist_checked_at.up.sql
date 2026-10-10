@@ -1,0 +1,2 @@
+ALTER TABLE artists
+ADD COLUMN checked_at INTEGER;

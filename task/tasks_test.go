@@ -209,18 +209,18 @@ func TestTasksStartRefreshAndRefreshArtist(t *testing.T) {
 	}, 2*time.Second, 5*time.Millisecond)
 }
 
-func TestTasksStartRunsImmediatelyAndOnInterval(t *testing.T) {
+func TestTasksStartSyncsLibraryImmediatelyAndOnInterval(t *testing.T) {
 	calls := []string{}
 	ran := make(chan struct{}, 100)
 	tasks := &Tasks{
 		cfg:           Config{Enabled: true, Interval: 50 * time.Millisecond},
 		refresh:       make(chan struct{}),
 		refreshArtist: make(chan database.Artist, 32),
-		tasks:         []task{&plainTask{calls: &calls, name: "t", ran: ran}},
+		librarySync:   []task{&plainTask{calls: &calls, name: "t", ran: ran}},
 	}
 	tasks.Start()
 
-	for i := 0; i < 3; i++ { // initial run, then two ticks
+	for i := 0; i < 3; i++ { // initial sync, then two ticks
 		select {
 		case <-ran:
 		case <-time.After(2 * time.Second):
@@ -331,7 +331,7 @@ func TestTasksStartContextStops(t *testing.T) {
 		cfg:           Config{Enabled: true, Interval: 10 * time.Millisecond},
 		refresh:       make(chan struct{}),
 		refreshArtist: make(chan database.Artist, 32),
-		tasks:         []task{&plainTask{calls: &calls, name: "t", ran: ran}},
+		librarySync:   []task{&plainTask{calls: &calls, name: "t", ran: ran}},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	tasks.StartContext(ctx)

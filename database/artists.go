@@ -22,6 +22,10 @@ type Artist struct {
 	MBzID       string `db:"mb_id"`
 	Name        string `db:"name"`
 	RefreshedAt *int64 `db:"refreshed_at"`
+	// CheckedAt is when the scheduler last checked the artist against
+	// MusicBrainz. It drives the spread of scheduled work and is distinct
+	// from RefreshedAt, which is shown in the UI.
+	CheckedAt *int64 `db:"checked_at"`
 }
 
 func (a Artist) MBzURL() string {
@@ -49,6 +53,9 @@ func (d *DB) addArtist(ctx context.Context, artist Artist) error {
 
 // addArtistLocked upserts an artist. The caller must hold d.lock.
 func (d *DB) addArtistLocked(ctx context.Context, artist Artist) error {
+	// checked_at is deliberately absent from the conflict update: it is owned
+	// by MarkArtistsChecked, and upserts coming from other sources must not
+	// reset it.
 	_, err := d.gq.
 		Insert(tableArtists).
 		Rows(artist).
@@ -151,6 +158,63 @@ func (d *DB) WatchedArtists(ctx context.Context) ([]Artist, error) {
 	}
 
 	return res, nil
+}
+
+// DueArtists returns watched artists never checked or last checked before
+// olderThan, never-checked first and then oldest first, at most limit.
+func (d *DB) DueArtists(ctx context.Context, olderThan time.Time, limit int) ([]Artist, error) {
+	res := []Artist{}
+	if limit <= 0 {
+		return res, nil
+	}
+
+	watched := d.gq.
+		Select("artist_mb_id").
+		From(tableArtistWatches).
+		Where(goqu.Ex{"status": 1})
+
+	err := d.gq.
+		Select("*").
+		From(tableArtists).
+		Where(
+			goqu.C("mb_id").In(watched),
+			goqu.Or(
+				goqu.C("checked_at").IsNull(),
+				goqu.C("checked_at").Lt(olderThan.Unix()),
+			),
+		).
+		Order(
+			goqu.C("checked_at").Asc().NullsFirst(),
+			goqu.C("mb_id").Asc(),
+		).
+		Limit(uint(limit)).
+		Executor().ScanStructsContext(ctx, &res)
+	if err != nil {
+		return nil, fmt.Errorf("list due artists: %w", err)
+	}
+
+	return res, nil
+}
+
+// MarkArtistsChecked records that the given artists were checked at at.
+func (d *DB) MarkArtistsChecked(ctx context.Context, ids []string, at time.Time) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	_, err := d.gq.
+		Update(tableArtists).
+		Set(goqu.Record{"checked_at": at.Unix()}).
+		Where(goqu.C("mb_id").In(ids)).
+		Executor().ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("mark artists checked: %w", err)
+	}
+
+	return nil
 }
 
 func (d *DB) UserWatchedArtists(ctx context.Context, user User) ([]Artist, error) {

@@ -26,10 +26,28 @@ type artistTask interface {
 	RunArtist(context.Context, database.Artist) error
 }
 
+type batchArtistTask interface {
+	ForBatch(context.Context) (artistTask, error)
+}
+
 type Tasks struct {
 	cfg Config
 
+	// tasks is the full pipeline, run on a user refresh.
 	tasks []task
+
+	// librarySync runs at boot and every Interval: Subsonic only, no
+	// MusicBrainz.
+	librarySync []task
+
+	// The MusicBrainz work, spread over Interval in batches of due artists.
+	db        *database.DB
+	releases  artistTask
+	inLibrary batchArtistTask
+	notify    task
+
+	// now is the clock, time.Now when nil.
+	now func() time.Time
 
 	refresh       chan struct{}
 	refreshArtist chan database.Artist
@@ -44,17 +62,22 @@ func New(
 	navi *navidrome.Client,
 	notifier notification.Notifier,
 ) *Tasks {
+	refreshArtists := NewRefreshArtists(db, sub)
+	refreshStarred := NewRefreshStarred(db, sub)
+	releases := NewRefreshArtistReleases(db, mbz)
+	inLibrary := NewRefreshInLibrary(db, mbz, sub, navi)
+	notify := NewSendNotifications(db, notifier, mbz)
+
 	return &Tasks{
 		cfg:           cfg,
 		refresh:       make(chan struct{}),
 		refreshArtist: make(chan database.Artist, refreshArtistBuffer),
-		tasks: []task{
-			NewRefreshArtists(db, sub),
-			NewRefreshStarred(db, sub),
-			NewRefreshArtistReleases(db, mbz),
-			NewRefreshInLibrary(db, mbz, sub, navi),
-			NewSendNotifications(db, notifier, mbz),
-		},
+		tasks:         []task{refreshArtists, refreshStarred, releases, inLibrary, notify},
+		librarySync:   []task{refreshArtists, refreshStarred, notify},
+		db:            db,
+		releases:      releases,
+		inLibrary:     inLibrary,
+		notify:        notify,
 	}
 }
 
@@ -62,43 +85,209 @@ func (t *Tasks) Start() {
 	t.StartContext(context.Background())
 }
 
+func (t *Tasks) clock() time.Time {
+	if t.now != nil {
+		return t.now()
+	}
+
+	return time.Now()
+}
+
+// batchSize is the number of artists to check per CheckInterval tick so that
+// all watched artists are checked once per Interval.
+func batchSize(watched int, checkInterval, interval time.Duration) int {
+	if watched <= 0 {
+		return 0
+	}
+	if interval <= 0 || checkInterval >= interval {
+		return watched
+	}
+	if checkInterval <= 0 {
+		return 1
+	}
+
+	n := (int64(watched)*int64(checkInterval) + int64(interval) - 1) / int64(interval)
+
+	return int(max(n, 1))
+}
+
 // StartContext starts the refresh loop, which stops when ctx is cancelled.
 func (t *Tasks) StartContext(ctx context.Context) {
 	go func() {
-		var tick <-chan time.Time
+		var syncTick, checkTick <-chan time.Time
 		var start chan struct{}
 
 		if t.cfg.Enabled {
-			ticker := time.NewTicker(t.cfg.Interval)
-			defer ticker.Stop()
-			tick = ticker.C
+			syncTicker := time.NewTicker(t.cfg.Interval)
+			defer syncTicker.Stop()
+			syncTick = syncTicker.C
 			start = make(chan struct{}, 1)
 			start <- struct{}{}
+
+			if t.cfg.CheckInterval > 0 {
+				checkTicker := time.NewTicker(t.cfg.CheckInterval)
+				defer checkTicker.Stop()
+				checkTick = checkTicker.C
+			}
 		}
 
 		for {
+			var err error
+
 			select {
 			case <-ctx.Done():
 				return
-			case <-tick:
+			case <-syncTick:
+				err = t.syncLibrary(ctx)
 			case <-start:
+				err = t.syncLibrary(ctx)
+			case <-checkTick:
+				err = t.checkDue(ctx, t.clock())
 			case <-t.refresh:
-
+				err = t.refreshAll(ctx)
 			case artist := <-t.refreshArtist:
-				err := t.RunArtist(ctx, artist)
-				if err != nil {
-					slog.Error(err.Error())
-				}
-
-				continue
+				err = t.refreshOne(ctx, artist)
 			}
 
-			err := t.Run(ctx)
 			if err != nil {
 				slog.Error(err.Error())
 			}
 		}
 	}()
+}
+
+// syncLibrary syncs artists and starred artists from Subsonic and sends
+// notifications. It does not use MusicBrainz.
+func (t *Tasks) syncLibrary(ctx context.Context) error {
+	t.running.Add(1)
+	defer t.running.Add(-1)
+
+	slog.Info("library sync started")
+
+	for _, task := range t.librarySync {
+		name := t.taskName(task)
+
+		slog.Info("task started", "task", name)
+
+		err := task.Run(ctx)
+		if err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+
+		slog.Info("task finished", "task", name)
+	}
+
+	slog.Info("library sync completed")
+
+	return nil
+}
+
+// checkDue checks against MusicBrainz the watched artists most overdue, as many
+// as needed to check every artist once per Interval. Every attempted artist
+// is marked as checked, even on failure, so that a failing artist or a
+// MusicBrainz outage is not retried at every tick.
+func (t *Tasks) checkDue(ctx context.Context, now time.Time) error {
+	t.running.Add(1)
+	defer t.running.Add(-1)
+
+	watched, err := t.db.WatchedArtists(ctx)
+	if err != nil {
+		return err
+	}
+
+	batch := batchSize(len(watched), t.cfg.CheckInterval, t.cfg.Interval)
+	if batch == 0 {
+		return nil
+	}
+
+	artists, err := t.db.DueArtists(ctx, now.Add(-t.cfg.Interval), batch)
+	if err != nil {
+		return err
+	}
+	if len(artists) == 0 {
+		return nil
+	}
+
+	slog.Info("checking due artists", "count", len(artists), "watched", len(watched))
+
+	inLibrary, err := t.inLibrary.ForBatch(ctx)
+	if err != nil {
+		return err
+	}
+
+	ids := make([]string, 0, len(artists))
+	for _, artist := range artists {
+		if ctx.Err() != nil {
+			break
+		}
+
+		err := t.releases.RunArtist(ctx, artist)
+		if err == nil {
+			err = inLibrary.RunArtist(ctx, artist)
+		}
+		if ctx.Err() != nil {
+			// interrupted, not a real attempt
+			break
+		}
+		if err != nil {
+			slog.Error("artist check failed", "artist", artist.Name, "error", err)
+		}
+
+		ids = append(ids, artist.MBzID)
+	}
+
+	err = t.db.MarkArtistsChecked(context.WithoutCancel(ctx), ids, now)
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return ctx.Err()
+	}
+
+	err = t.notify.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("%s: %w", t.taskName(t.notify), err)
+	}
+
+	return nil
+}
+
+// refreshAll is the user-triggered refresh: it runs the whole pipeline and
+// marks every watched artist as checked.
+func (t *Tasks) refreshAll(ctx context.Context) error {
+	err := t.Run(ctx)
+	if err != nil {
+		return err
+	}
+
+	if t.db == nil {
+		return nil
+	}
+
+	watched, err := t.db.WatchedArtists(ctx)
+	if err != nil {
+		return err
+	}
+
+	ids := make([]string, 0, len(watched))
+	for _, a := range watched {
+		ids = append(ids, a.MBzID)
+	}
+
+	return t.db.MarkArtistsChecked(ctx, ids, t.clock())
+}
+
+func (t *Tasks) refreshOne(ctx context.Context, artist database.Artist) error {
+	err := t.RunArtist(ctx, artist)
+	if err != nil {
+		return err
+	}
+
+	if t.db == nil {
+		return nil
+	}
+
+	return t.db.MarkArtistsChecked(ctx, []string{artist.MBzID}, t.clock())
 }
 
 func (t *Tasks) Run(ctx context.Context) error {

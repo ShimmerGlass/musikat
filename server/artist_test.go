@@ -61,6 +61,9 @@ func TestWatchAndStopWatch(t *testing.T) {
 	require.True(t, status)
 	require.Equal(t, "ui", source)
 
+	// A new watch queues an immediate refresh of the artist.
+	require.Equal(t, 1, e.s.tasks.QueuedArtists())
+
 	// Other users are unaffected.
 	status, _ = e.watchStatus("bob", "a1")
 	require.False(t, status)
@@ -70,12 +73,14 @@ func TestWatchAndStopWatch(t *testing.T) {
 	require.Equal(t, http.StatusSeeOther, rec.Code)
 	status, _ = e.watchStatus("alice", "a1")
 	require.True(t, status)
+	require.Equal(t, 1, e.s.tasks.QueuedArtists())
 
 	rec = e.authed(e.s.stopWatchArtist, cookie, http.MethodGet, "/artists/a1/stop-watch", nil, pv)
 	require.Equal(t, http.StatusSeeOther, rec.Code)
 	require.Equal(t, "/artists/a1", rec.Header().Get("Location"))
 	status, _ = e.watchStatus("alice", "a1")
 	require.False(t, status)
+	require.Equal(t, 1, e.s.tasks.QueuedArtists())
 
 	// Index lists watched artists for the user only after watching.
 	rec = e.authed(e.s.artist, cookie, http.MethodGet, "/artists/a1", nil, pv)

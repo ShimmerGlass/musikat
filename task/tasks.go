@@ -93,9 +93,11 @@ func (t *Tasks) clock() time.Time {
 	return time.Now()
 }
 
-// batchSize is the number of artists to check per CheckInterval tick so that
-// all watched artists are checked once per Interval.
-func batchSize(watched int, checkInterval, interval time.Duration) int {
+// batchSize is the number of artists to check per checkInterval tick: the
+// steady rate so that all watched artists are checked once per interval, plus
+// a share of the late artists (overdue by more than one tick) so that a
+// backlog is drained within one interval.
+func batchSize(watched, late int, checkInterval, interval time.Duration) int {
 	if watched <= 0 {
 		return 0
 	}
@@ -106,9 +108,11 @@ func batchSize(watched int, checkInterval, interval time.Duration) int {
 		return 1
 	}
 
-	n := (int64(watched)*int64(checkInterval) + int64(interval) - 1) / int64(interval)
+	steady := (int64(watched)*int64(checkInterval) + int64(interval) - 1) / int64(interval)
+	ticks := (int64(interval) + int64(checkInterval) - 1) / int64(checkInterval)
+	backlog := (int64(max(late, 0)) + ticks - 1) / ticks
 
-	return int(max(n, 1))
+	return int(min(max(steady+backlog, 1), int64(watched)))
 }
 
 // StartContext starts the refresh loop, which stops when ctx is cancelled.
@@ -124,11 +128,9 @@ func (t *Tasks) StartContext(ctx context.Context) {
 			start = make(chan struct{}, 1)
 			start <- struct{}{}
 
-			if t.cfg.CheckInterval > 0 {
-				checkTicker := time.NewTicker(t.cfg.CheckInterval)
-				defer checkTicker.Stop()
-				checkTick = checkTicker.C
-			}
+			checkTicker := time.NewTicker(t.cfg.checkInterval())
+			defer checkTicker.Stop()
+			checkTick = checkTicker.C
 		}
 
 		for {
@@ -190,15 +192,27 @@ func (t *Tasks) checkDue(ctx context.Context, now time.Time) error {
 	t.running.Add(1)
 	defer t.running.Add(-1)
 
+	if t.db == nil {
+		return nil
+	}
+
 	watched, err := t.db.WatchedArtists(ctx)
 	if err != nil {
 		return err
 	}
 
-	batch := batchSize(len(watched), t.cfg.CheckInterval, t.cfg.Interval)
-	if batch == 0 {
+	if len(watched) == 0 {
 		return nil
 	}
+
+	checkInterval := t.cfg.checkInterval()
+
+	late, err := t.db.CountDueArtists(ctx, now.Add(-t.cfg.Interval-checkInterval))
+	if err != nil {
+		return err
+	}
+
+	batch := batchSize(len(watched), late, checkInterval, t.cfg.Interval)
 
 	artists, err := t.db.DueArtists(ctx, now.Add(-t.cfg.Interval), batch)
 	if err != nil {
@@ -210,9 +224,11 @@ func (t *Tasks) checkDue(ctx context.Context, now time.Time) error {
 
 	slog.Info("checking due artists", "count", len(artists), "watched", len(watched))
 
+	// Without Subsonic or Navidrome only the in-library step is skipped.
 	inLibrary, err := t.inLibrary.ForBatch(ctx)
 	if err != nil {
-		return err
+		slog.Warn("in-library refresh unavailable, skipping it for this batch", "error", err)
+		inLibrary = nil
 	}
 
 	ids := make([]string, 0, len(artists))
@@ -222,7 +238,7 @@ func (t *Tasks) checkDue(ctx context.Context, now time.Time) error {
 		}
 
 		err := t.releases.RunArtist(ctx, artist)
-		if err == nil {
+		if err == nil && inLibrary != nil {
 			err = inLibrary.RunArtist(ctx, artist)
 		}
 		if ctx.Err() != nil {
@@ -354,6 +370,11 @@ func (t *Tasks) Refresh() {
 	case t.refresh <- struct{}{}:
 	default:
 	}
+}
+
+// QueuedArtists is the number of artist refreshes waiting to be run.
+func (t *Tasks) QueuedArtists() int {
+	return len(t.refreshArtist)
 }
 
 func (t *Tasks) RefreshArtist(artist database.Artist) {

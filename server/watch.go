@@ -41,7 +41,7 @@ func (s *Server) artistWatchUpdate(ctx context.Context, rw http.ResponseWriter, 
 	}
 
 	artistID := r.PathValue("mbid")
-	err = s.requireArtist(ctx, artistID)
+	_, err = s.requireArtist(ctx, artistID)
 	if err != nil {
 		return err
 	}

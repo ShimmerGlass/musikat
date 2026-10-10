@@ -13,24 +13,35 @@ import (
 func TestBatchSize(t *testing.T) {
 	const day = 24 * time.Hour
 	for name, tc := range map[string]struct {
-		watched       int
+		watched, late int
 		check, interv time.Duration
 		want          int
 	}{
-		"none watched":           {0, 15 * time.Minute, day, 0},
-		"exact":                  {96, 15 * time.Minute, day, 1},
-		"rounds up":              {97, 15 * time.Minute, day, 2},
-		"one artist":             {1, 15 * time.Minute, day, 1},
-		"many":                   {960, 15 * time.Minute, day, 10},
-		"check longer":           {5, 2 * day, day, 5},
-		"check equals interval":  {7, day, day, 7},
-		"zero check interval":    {7, 0, day, 1},
-		"zero interval":          {7, time.Minute, 0, 7},
-		"negative watched":       {-1, time.Minute, day, 0},
-		"check longer, no watch": {0, 2 * day, day, 0},
+		"none watched":           {0, 0, 15 * time.Minute, day, 0},
+		"exact":                  {96, 0, 15 * time.Minute, day, 1},
+		"rounds up":              {97, 0, 15 * time.Minute, day, 2},
+		"one artist":             {1, 0, 15 * time.Minute, day, 1},
+		"many":                   {960, 0, 15 * time.Minute, day, 10},
+		"check longer":           {5, 0, 2 * day, day, 5},
+		"check equals interval":  {7, 0, day, day, 7},
+		"zero check interval":    {7, 0, 0, day, 1},
+		"zero interval":          {7, 0, time.Minute, 0, 7},
+		"negative watched":       {-1, 0, time.Minute, day, 0},
+		"check longer, no watch": {0, 0, 2 * day, day, 0},
+		"late adds a share":      {960, 960, 15 * time.Minute, day, 20},
+		"late rounds up":         {960, 1, 15 * time.Minute, day, 11},
+		"late capped at watched": {10, 10, 12 * time.Hour, day, 10},
+		"negative late":          {96, -5, 15 * time.Minute, day, 1},
+		"late, check longer":     {5, 5, 2 * day, day, 5},
 	} {
-		require.Equal(t, tc.want, batchSize(tc.watched, tc.check, tc.interv), name)
+		require.Equal(t, tc.want, batchSize(tc.watched, tc.late, tc.check, tc.interv), name)
 	}
+}
+
+func TestConfigCheckInterval(t *testing.T) {
+	require.Equal(t, time.Hour, Config{Interval: 24 * time.Hour, CheckInterval: time.Hour}.checkInterval())
+	require.Equal(t, 24*time.Hour, Config{Interval: 24 * time.Hour}.checkInterval())
+	require.Equal(t, 24*time.Hour, Config{Interval: 24 * time.Hour, CheckInterval: -1}.checkInterval())
 }
 
 // schedEnv has n watched artists a1..an and a Tasks built with New.
@@ -66,7 +77,8 @@ func (s *schedEnv) checkedAt(t *testing.T, id string) *int64 {
 
 func TestCheckDueProcessesOnlyBatchOldestFirst(t *testing.T) {
 	ctx := context.Background()
-	// 4 artists, 6h check over 24h: batch of 1
+	// 4 artists, 6h check over 24h: steady batch of 1, plus 1 for the late
+	// (never checked) a4
 	s := newSchedEnv(t, 4, Config{Interval: 24 * time.Hour, CheckInterval: 6 * time.Hour})
 	require.NoError(t, s.db.MarkArtistsChecked(ctx, []string{"a1"}, s.now.Add(-20*time.Hour)))
 	require.NoError(t, s.db.MarkArtistsChecked(ctx, []string{"a2"}, s.now.Add(-30*time.Hour)))
@@ -75,15 +87,16 @@ func TestCheckDueProcessesOnlyBatchOldestFirst(t *testing.T) {
 
 	require.NoError(t, s.tasks.checkDue(ctx, s.now))
 
-	require.Equal(t, 1, s.mb.requestCount())
-	require.Equal(t, 1, s.mb.artistRequests("a4"))
-	require.Equal(t, s.now.Unix(), *s.checkedAt(t, "a4"))
-	require.Equal(t, s.now.Add(-30*time.Hour).Unix(), *s.checkedAt(t, "a2"))
-
-	// next: the oldest one
-	require.NoError(t, s.tasks.checkDue(ctx, s.now))
-	require.Equal(t, 1, s.mb.artistRequests("a2"))
 	require.Equal(t, 2, s.mb.requestCount())
+	require.Equal(t, 1, s.mb.artistRequests("a4"))
+	require.Equal(t, 1, s.mb.artistRequests("a2"))
+	require.Equal(t, s.now.Unix(), *s.checkedAt(t, "a4"))
+	require.Equal(t, s.now.Add(-25*time.Hour).Unix(), *s.checkedAt(t, "a3"))
+
+	// nothing is late anymore: the batch is the steady one, the oldest
+	require.NoError(t, s.tasks.checkDue(ctx, s.now))
+	require.Equal(t, 1, s.mb.artistRequests("a3"))
+	require.Equal(t, 3, s.mb.requestCount())
 	require.False(t, s.tasks.Running())
 }
 
@@ -239,4 +252,81 @@ func TestStartContextChecksDueOnCheckTick(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return s.mb.artistRequests("a1") >= 1 && s.mb.artistRequests("a2") >= 1
 	}, 5*time.Second, 10*time.Millisecond)
+}
+
+// simulate runs ticks checkDue calls, advancing the clock by the check interval.
+func simulate(t *testing.T, s *schedEnv, cfg Config, ticks int) {
+	for range ticks {
+		require.NoError(t, s.tasks.checkDue(context.Background(), s.now))
+		s.now = s.now.Add(cfg.checkInterval())
+	}
+}
+
+func TestCheckDueDrainsBacklogWithinInterval(t *testing.T) {
+	const n = 10
+	cfg := Config{Interval: 24 * time.Hour, CheckInterval: 3 * time.Hour}
+	ticks := int(cfg.Interval / cfg.CheckInterval)
+
+	for name, gap := range map[string]time.Duration{
+		"fresh deploy": 0,
+		"long gap":     5 * 24 * time.Hour,
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newSchedEnv(t, n, cfg)
+			if gap > 0 {
+				// everyone checked once, then downtime
+				simulate(t, s, cfg, ticks)
+				s.now = s.now.Add(gap)
+			}
+			base := s.mb.requestCount()
+
+			simulate(t, s, cfg, ticks)
+			require.Equal(t, base+n, s.mb.requestCount())
+
+			// steady state: once per interval again
+			simulate(t, s, cfg, ticks)
+			require.Equal(t, base+2*n, s.mb.requestCount())
+			simulate(t, s, cfg, ticks)
+			require.Equal(t, base+3*n, s.mb.requestCount())
+		})
+	}
+}
+
+func TestCheckDueNoCheckIntervalChecksAllEveryInterval(t *testing.T) {
+	ctx := context.Background()
+	cfg := Config{Interval: time.Hour}
+	s := newSchedEnv(t, 5, cfg)
+
+	require.NoError(t, s.tasks.checkDue(ctx, s.now))
+	require.Equal(t, 5, s.mb.requestCount())
+
+	s.now = s.now.Add(time.Hour + time.Second)
+	require.NoError(t, s.tasks.checkDue(ctx, s.now))
+	require.Equal(t, 10, s.mb.requestCount())
+}
+
+func TestStartContextNoCheckIntervalStillChecks(t *testing.T) {
+	s := newSchedEnv(t, 2, Config{Enabled: true, Interval: 30 * time.Millisecond})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.tasks.StartContext(ctx)
+
+	require.Eventually(t, func() bool {
+		return s.mb.artistRequests("a1") >= 1 && s.mb.artistRequests("a2") >= 1
+	}, 5*time.Second, 10*time.Millisecond)
+}
+
+func TestCheckDueWithoutSubsonicStillChecksReleases(t *testing.T) {
+	ctx := context.Background()
+	s := newSchedEnv(t, 2, Config{Interval: time.Hour, CheckInterval: time.Hour})
+	// Navidrome is down: the in-library step cannot resolve its clients
+	s.navi.Close()
+
+	require.NoError(t, s.tasks.checkDue(ctx, s.now))
+
+	require.Equal(t, 1, s.mb.artistRequests("a1"))
+	require.Equal(t, 1, s.mb.artistRequests("a2"))
+	require.NotNil(t, s.checkedAt(t, "a1"))
+	require.NotNil(t, s.checkedAt(t, "a2"))
 }

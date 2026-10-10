@@ -160,6 +160,25 @@ func (d *DB) WatchedArtists(ctx context.Context) ([]Artist, error) {
 	return res, nil
 }
 
+// dueArtists selects the watched artists never checked or last checked before
+// olderThan.
+func (d *DB) dueArtists(olderThan time.Time) *goqu.SelectDataset {
+	watched := d.gq.
+		Select("artist_mb_id").
+		From(tableArtistWatches).
+		Where(goqu.Ex{"status": 1})
+
+	return d.gq.
+		From(tableArtists).
+		Where(
+			goqu.C("mb_id").In(watched),
+			goqu.Or(
+				goqu.C("checked_at").IsNull(),
+				goqu.C("checked_at").Lt(olderThan.Unix()),
+			),
+		)
+}
+
 // DueArtists returns watched artists never checked or last checked before
 // olderThan, never-checked first and then oldest first, at most limit.
 func (d *DB) DueArtists(ctx context.Context, olderThan time.Time, limit int) ([]Artist, error) {
@@ -168,21 +187,8 @@ func (d *DB) DueArtists(ctx context.Context, olderThan time.Time, limit int) ([]
 		return res, nil
 	}
 
-	watched := d.gq.
-		Select("artist_mb_id").
-		From(tableArtistWatches).
-		Where(goqu.Ex{"status": 1})
-
-	err := d.gq.
+	err := d.dueArtists(olderThan).
 		Select("*").
-		From(tableArtists).
-		Where(
-			goqu.C("mb_id").In(watched),
-			goqu.Or(
-				goqu.C("checked_at").IsNull(),
-				goqu.C("checked_at").Lt(olderThan.Unix()),
-			),
-		).
 		Order(
 			goqu.C("checked_at").Asc().NullsFirst(),
 			goqu.C("mb_id").Asc(),
@@ -194,6 +200,21 @@ func (d *DB) DueArtists(ctx context.Context, olderThan time.Time, limit int) ([]
 	}
 
 	return res, nil
+}
+
+// CountDueArtists returns the number of artists DueArtists would return
+// without a limit.
+func (d *DB) CountDueArtists(ctx context.Context, olderThan time.Time) (int, error) {
+	var n int
+
+	_, err := d.dueArtists(olderThan).
+		Select(goqu.COUNT("*")).
+		Executor().ScanValContext(ctx, &n)
+	if err != nil {
+		return 0, fmt.Errorf("count due artists: %w", err)
+	}
+
+	return n, nil
 }
 
 // MarkArtistsChecked records that the given artists were checked at at.

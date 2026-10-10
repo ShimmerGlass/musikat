@@ -285,6 +285,13 @@ func TestDueArtistsAndMarkChecked(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []string{"a1", "a2", "a3"}, ids(due))
 
+		n, err := db.CountDueArtists(ctx, base.Add(-30*time.Minute))
+		require.NoError(t, err)
+		require.Equal(t, 4, n)
+		n, err = db.CountDueArtists(ctx, base.Add(-time.Hour))
+		require.NoError(t, err)
+		require.Equal(t, 3, n)
+
 		due, err = db.DueArtists(ctx, base, 0)
 		require.NoError(t, err)
 		require.Empty(t, due)

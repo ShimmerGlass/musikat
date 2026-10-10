@@ -69,15 +69,16 @@ func TestReleasesFetchedAtSurvivesPut(t *testing.T) {
 	})
 }
 
-func TestDeleteReleaseGroupDeletesCache(t *testing.T) {
+func TestRemoveReleaseGroupArtistDeletesCache(t *testing.T) {
 	WithDB(t, func(ctx context.Context, db *DB) {
-		seedRG(t, ctx, db, ReleaseGroup{MBzID: "rg1"})
-		seedRG(t, ctx, db, ReleaseGroup{MBzID: "rg2"})
+		a1 := seedArtist(t, ctx, db, "a1")
+		seedRG(t, ctx, db, ReleaseGroup{MBzID: "rg1"}, a1)
+		seedRG(t, ctx, db, ReleaseGroup{MBzID: "rg2"}, a1)
 		cr := []CachedRelease{{MBzID: "r1", RecordingIDs: []string{"x"}}}
 		require.NoError(t, db.ReplaceReleaseGroupReleases(ctx, "rg1", cr, time.Now()))
 		require.NoError(t, db.ReplaceReleaseGroupReleases(ctx, "rg2", cr, time.Now()))
 
-		require.NoError(t, db.DeleteReleaseGroup(ctx, "rg1"))
+		require.NoError(t, db.RemoveReleaseGroupArtist(ctx, "rg1", "a1"))
 
 		got, err := db.ReleaseGroupReleases(ctx, "rg1")
 		require.NoError(t, err)

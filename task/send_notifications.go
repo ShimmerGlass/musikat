@@ -2,7 +2,9 @@ package task
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/shimmerglass/musikat/database"
@@ -30,14 +32,45 @@ func (t *SendNotifications) Run(ctx context.Context) error {
 		return err
 	}
 
+	var errs []error
 	for _, user := range users {
 		err := t.runUser(ctx, user)
 		if err != nil {
-			return err
+			slog.Error("sending notifications failed", "user", user.Name, "error", err)
+			errs = append(errs, fmt.Errorf("user %s: %w", user.Name, err))
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
+}
+
+// shouldNotify reports whether a notification is due for rg, ignoring whether
+// the user was already notified. A release is out once its date is reached
+// (for partial dates, once the whole period has elapsed), and is ignored if
+// its whole period ended before the watch was added.
+func shouldNotify(rg database.ReleaseGroup, watch database.ArtistWatch, now time.Time) bool {
+	if !watch.Status {
+		return false
+	}
+
+	if rg.LibraryStatus != database.LibraryStatusMissing {
+		return false
+	}
+
+	if !watch.Watches(rg) {
+		return false
+	}
+
+	end := rg.ReleaseEnd()
+	if rg.IsFullDate() {
+		if rg.ReleaseTime().After(now) {
+			return false
+		}
+	} else if end.After(now) {
+		return false
+	}
+
+	return end.After(time.Unix(watch.AddedAt, 0))
 }
 
 func (t *SendNotifications) runUser(ctx context.Context, user database.User) error {
@@ -54,6 +87,10 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 	now := time.Now()
 
 	for _, watch := range watches {
+		if !watch.Status {
+			continue
+		}
+
 		artist, err := t.db.Artist(ctx, watch.ArtistMBzID)
 		if err != nil {
 			return err
@@ -65,20 +102,7 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 		}
 
 		for _, rg := range rgs {
-			if rg.LibraryStatus != database.LibraryStatusMissing {
-				continue
-			}
-
-			if !watch.Watches(rg) {
-				continue
-			}
-
-			releaseTime := rg.ReleaseTime()
-			if releaseTime.After(now) {
-				continue
-			}
-
-			if releaseTime.Before(time.Unix(watch.AddedAt, 0)) {
+			if !shouldNotify(rg, watch, now) {
 				continue
 			}
 
@@ -86,17 +110,26 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 				continue
 			}
 
-			message := fmt.Sprintf("New release from %s!\n%s\n%s", artist.Name, rg.Name, rg.MBzURL())
-			err = t.notifier.Send(ctx, user, message)
-			if err != nil {
-				return err
-			}
-
+			// Record first so a crash between the two steps can never lead to
+			// duplicate messages; undo the record if sending fails.
 			err = t.db.AddReleaseGroupNotification(ctx, rg.MBzID, user.ID)
 			if err != nil {
 				return err
 			}
 			notified[rg.MBzID] = struct{}{}
+
+			message := fmt.Sprintf("New release from %s!\n%s\n%s", artist.Name, rg.Name, rg.MBzURL())
+			err = t.notifier.Send(ctx, user, message)
+			if err != nil {
+				slog.Error("sending notification failed", "user", user.Name, "release_group", rg.Name, "error", err)
+
+				delErr := t.db.DeleteReleaseGroupNotification(ctx, rg.MBzID, user.ID)
+				if delErr != nil {
+					slog.Error("removing notification record failed", "user", user.Name, "release_group", rg.Name, "error", delErr)
+				} else {
+					delete(notified, rg.MBzID)
+				}
+			}
 		}
 	}
 

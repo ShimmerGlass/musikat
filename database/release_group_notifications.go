@@ -28,21 +28,22 @@ func (d *DB) AddReleaseGroupNotification(ctx context.Context, rgID, userID strin
 	return nil
 }
 
-func (d *DB) HasReleaseGroupNotification(ctx context.Context, rgID, userID string) (bool, error) {
-	var count int
+func (d *DB) DeleteReleaseGroupNotification(ctx context.Context, rgID, userID string) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	_, err := d.gq.
-		Select(goqu.L("count(*)")).
-		From(tableReleaseGroupNotifications).
+		Delete(tableReleaseGroupNotifications).
 		Where(
 			goqu.C("user_id").Eq(userID),
 			goqu.C("release_group_mb_id").Eq(rgID),
 		).
-		Executor().ScanValContext(ctx, &count)
+		Executor().ExecContext(ctx)
 	if err != nil {
-		return false, fmt.Errorf("has release group notification: %w", err)
+		return fmt.Errorf("delete release group notification: %w", err)
 	}
 
-	return count > 0, nil
+	return nil
 }
 
 // NotifiedReleaseGroupIDs returns the set of release group MBIDs the user has

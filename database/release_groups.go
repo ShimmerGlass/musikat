@@ -58,29 +58,66 @@ func (r ReleaseGroup) MBzURL() string {
 }
 
 func (r ReleaseGroup) ReleaseTime() time.Time {
-	year := 0
-	month := time.January
-	day := 1
+	year, month, day, _ := r.parseReleaseDate()
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+}
+
+// ReleaseEnd returns the exclusive end of the release period: the start of the
+// day after a full date, of the month after a year-month date, or of the year
+// after a year-only date. Empty or unparsable dates follow ReleaseTime (year 0
+// is treated as a year-only date).
+func (r ReleaseGroup) ReleaseEnd() time.Time {
+	year, month, day, precision := r.parseReleaseDate()
+	switch precision {
+	case precisionDay:
+		return time.Date(year, month, day+1, 0, 0, 0, 0, time.UTC)
+	case precisionMonth:
+		return time.Date(year, month+1, 1, 0, 0, 0, 0, time.UTC)
+	default:
+		return time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.UTC)
+	}
+}
+
+// IsFullDate reports whether the release date has day precision.
+func (r ReleaseGroup) IsFullDate() bool {
+	_, _, _, precision := r.parseReleaseDate()
+	return precision == precisionDay
+}
+
+const (
+	precisionYear = iota
+	precisionMonth
+	precisionDay
+)
+
+// parseReleaseDate parses year, month and day, defaulting unparsable parts to
+// 0 (year) or 1 (month, day). precision is the number of leading parts that
+// parsed successfully, e.g. "2005-??-31" has year precision.
+func (r ReleaseGroup) parseReleaseDate() (year int, month time.Month, day int, precision int) {
+	month = time.January
+	day = 1
 
 	parts := strings.Split(r.ReleaseDate, "-")
 
-	if len(parts) > 0 {
-		year, _ = strconv.Atoi(parts[0])
-	}
+	year, _ = strconv.Atoi(parts[0])
 	if len(parts) > 1 {
 		m, err := strconv.Atoi(parts[1])
 		if err == nil {
 			month = time.Month(m)
+			precision = precisionMonth
 		}
 	}
 	if len(parts) > 2 {
 		d, err := strconv.Atoi(parts[2])
 		if err == nil {
 			day = d
+			if precision == precisionMonth {
+				precision = precisionDay
+			}
 		}
 	}
 
-	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+	return year, month, day, precision
 }
 
 func (d *DB) addReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
@@ -140,17 +177,57 @@ func (d *DB) ReleaseGroup(ctx context.Context, mbzID string) (ReleaseGroup, erro
 	return rg, nil
 }
 
-func (d *DB) DeleteReleaseGroup(ctx context.Context, mbzID string) error {
+// RemoveReleaseGroupArtist unlinks an artist from a release group. If no
+// artist remains linked, the release group itself is deleted along with its
+// notifications and cached releases.
+func (d *DB) RemoveReleaseGroupArtist(ctx context.Context, rgID, artistID string) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
 	tx, err := d.gq.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("delete release group: begin: %w", err)
+		return fmt.Errorf("remove release group artist: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.
+		Delete(tableReleaseGroupArtists).
+		Where(goqu.Ex{
+			"release_group_mb_id": rgID,
+			"artist_mb_id":        artistID,
+		}).
+		Executor().ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("remove release group artist: %w", err)
+	}
+
+	var remaining int
+	_, err = tx.
+		Select(goqu.COUNT("*")).
+		From(tableReleaseGroupArtists).
+		Where(goqu.C("release_group_mb_id").Eq(rgID)).
+		Executor().ScanValContext(ctx, &remaining)
+	if err != nil {
+		return fmt.Errorf("remove release group artist: count remaining: %w", err)
+	}
+
+	if remaining == 0 {
+		err = deleteReleaseGroupTx(ctx, tx, rgID)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("remove release group artist: commit: %w", err)
+	}
+
+	return nil
+}
+
+func deleteReleaseGroupTx(ctx context.Context, tx *goqu.TxDatabase, mbzID string) error {
+	_, err := tx.
 		Delete(tableReleaseGroupArtists).
 		Where(goqu.Ex{
 			"release_group_mb_id": mbzID,
@@ -186,11 +263,6 @@ func (d *DB) DeleteReleaseGroup(ctx context.Context, mbzID string) error {
 		Executor().ExecContext(ctx)
 	if err != nil {
 		return fmt.Errorf("delete release group: %w", err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return fmt.Errorf("delete release group: commit: %w", err)
 	}
 
 	return nil

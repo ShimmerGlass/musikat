@@ -116,7 +116,7 @@ func TestNotifiedReleaseGroupIDs(t *testing.T) {
 	})
 }
 
-func TestDeleteReleaseGroup(t *testing.T) {
+func TestRemoveReleaseGroupArtistLastArtist(t *testing.T) {
 	WithDB(t, func(ctx context.Context, db *DB) {
 		a1 := seedArtist(t, ctx, db, "a1")
 		seedRG(t, ctx, db, ReleaseGroup{MBzID: "r1", ReleaseDate: "2020"}, a1)
@@ -124,7 +124,7 @@ func TestDeleteReleaseGroup(t *testing.T) {
 		require.NoError(t, db.AddReleaseGroupNotification(ctx, "r1", "u1"))
 		require.NoError(t, db.AddReleaseGroupNotification(ctx, "r2", "u1"))
 
-		require.NoError(t, db.DeleteReleaseGroup(ctx, "r1"))
+		require.NoError(t, db.RemoveReleaseGroupArtist(ctx, "r1", "a1"))
 
 		_, err := db.ReleaseGroup(ctx, "r1")
 		require.ErrorIs(t, err, ErrReleaseGroupNotFound)
@@ -135,5 +135,56 @@ func TestDeleteReleaseGroup(t *testing.T) {
 		got, err := db.NotifiedReleaseGroupIDs(ctx, "u1")
 		require.NoError(t, err)
 		require.Equal(t, map[string]struct{}{"r2": {}}, got)
+	})
+}
+
+func TestRemoveReleaseGroupArtistShared(t *testing.T) {
+	WithDB(t, func(ctx context.Context, db *DB) {
+		a1 := seedArtist(t, ctx, db, "a1")
+		a2 := seedArtist(t, ctx, db, "a2")
+		seedRG(t, ctx, db, ReleaseGroup{MBzID: "r1", ReleaseDate: "2020"}, a1, a2)
+		require.NoError(t, db.AddReleaseGroupNotification(ctx, "r1", "u1"))
+		cr := []CachedRelease{{MBzID: "x", RecordingIDs: []string{"y"}}}
+		require.NoError(t, db.ReplaceReleaseGroupReleases(ctx, "r1", cr, time.Now()))
+
+		require.NoError(t, db.RemoveReleaseGroupArtist(ctx, "r1", "a1"))
+
+		_, err := db.ReleaseGroup(ctx, "r1")
+		require.NoError(t, err)
+		rgs, err := db.ArtistReleaseGroups(ctx, a1)
+		require.NoError(t, err)
+		require.Empty(t, rgs)
+		rgs, err = db.ArtistReleaseGroups(ctx, a2)
+		require.NoError(t, err)
+		require.Len(t, rgs, 1)
+		got, err := db.NotifiedReleaseGroupIDs(ctx, "u1")
+		require.NoError(t, err)
+		require.Equal(t, map[string]struct{}{"r1": {}}, got)
+		cached, err := db.ReleaseGroupReleases(ctx, "r1")
+		require.NoError(t, err)
+		require.Len(t, cached, 1)
+
+		// removing the last artist drops the group
+		require.NoError(t, db.RemoveReleaseGroupArtist(ctx, "r1", "a2"))
+		_, err = db.ReleaseGroup(ctx, "r1")
+		require.ErrorIs(t, err, ErrReleaseGroupNotFound)
+		got, err = db.NotifiedReleaseGroupIDs(ctx, "u1")
+		require.NoError(t, err)
+		require.Empty(t, got)
+	})
+}
+
+func TestDeleteReleaseGroupNotification(t *testing.T) {
+	WithDB(t, func(ctx context.Context, db *DB) {
+		require.NoError(t, db.AddReleaseGroupNotification(ctx, "r1", "u1"))
+		require.NoError(t, db.AddReleaseGroupNotification(ctx, "r1", "u2"))
+		require.NoError(t, db.DeleteReleaseGroupNotification(ctx, "r1", "u1"))
+
+		got, err := db.NotifiedReleaseGroupIDs(ctx, "u1")
+		require.NoError(t, err)
+		require.Empty(t, got)
+		got, err = db.NotifiedReleaseGroupIDs(ctx, "u2")
+		require.NoError(t, err)
+		require.Len(t, got, 1)
 	})
 }

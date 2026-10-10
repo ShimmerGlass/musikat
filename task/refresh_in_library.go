@@ -84,7 +84,12 @@ func (t *RefreshInLibrary) runArtist(ctx context.Context, artist database.Artist
 
 	artistID, err := sub.ArtistSubsonicID(ctx, artist)
 	if errors.Is(err, subsonic.ErrArtistNotFound) {
-		return nil
+		err = t.markAllMissing(ctx, rgs)
+		if err != nil {
+			return err
+		}
+
+		return t.markRefreshed(ctx, artist)
 	}
 	if err != nil {
 		return err
@@ -148,26 +153,47 @@ func (t *RefreshInLibrary) runArtist(ctx context.Context, artist database.Artist
 			state = cachedState(songAlbumIDs, artistRecordingIDs, cached)
 		}
 
-		if state.Status == releaseGroup.LibraryStatus && state.ReleaseID == releaseGroup.InLibraryReleaseMBzID {
-			continue
-		}
-
-		err = t.db.PutReleaseGroup(ctx, releaseGroup.MBzID, func(o opt.Option[database.ReleaseGroup]) database.ReleaseGroup {
-			rg := o.TakeOr(releaseGroup)
-			rg.LibraryStatus = state.Status
-			rg.InLibraryReleaseMBzID = state.ReleaseID
-			return rg
-		})
+		err = t.setLibraryState(ctx, releaseGroup, state)
 		if err != nil {
 			return err
 		}
 	}
 
+	return t.markRefreshed(ctx, artist)
+}
+
+// markAllMissing handles an artist with no library content at all.
+func (t *RefreshInLibrary) markAllMissing(ctx context.Context, rgs []database.ReleaseGroup) error {
+	for _, rg := range rgs {
+		err := t.setLibraryState(ctx, rg, libraryState{Status: database.LibraryStatusMissing})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// setLibraryState writes the library state of a release group, only if it
+// differs from the current one.
+func (t *RefreshInLibrary) setLibraryState(ctx context.Context, releaseGroup database.ReleaseGroup, state libraryState) error {
+	if state.Status == releaseGroup.LibraryStatus && state.ReleaseID == releaseGroup.InLibraryReleaseMBzID {
+		return nil
+	}
+
+	return t.db.PutReleaseGroup(ctx, releaseGroup.MBzID, func(o opt.Option[database.ReleaseGroup]) database.ReleaseGroup {
+		rg := o.TakeOr(releaseGroup)
+		rg.LibraryStatus = state.Status
+		rg.InLibraryReleaseMBzID = state.ReleaseID
+		return rg
+	})
+}
+
+func (t *RefreshInLibrary) markRefreshed(ctx context.Context, artist database.Artist) error {
 	return t.db.PutArtist(ctx, artist.MBzID, func(o opt.Option[database.Artist]) database.Artist {
 		a := o.TakeOr(artist)
 		a.RefreshedAt = new(time.Now().Unix())
 		return a
-
 	})
 }
 

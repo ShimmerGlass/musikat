@@ -38,6 +38,18 @@ func (s *Server) authHandler(next userHandler) handler {
 	}
 }
 
+// adminHandler restricts next to admin users. It must be composed after
+// authHandler.
+func (s *Server) adminHandler(next userHandler) userHandler {
+	return func(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
+		if !user.Admin {
+			return forbidden(fmt.Errorf("admin access required"))
+		}
+
+		return next(ctx, rw, r, user)
+	}
+}
+
 func (s *Server) auth(ctx context.Context, r *http.Request) (database.User, bool, error) {
 	cookie, err := r.Cookie(authCookie)
 	if errors.Is(err, http.ErrNoCookie) {

@@ -7,6 +7,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestArtistWatchEmptyTypesAreNil(t *testing.T) {
+	w := ArtistWatch{}
+	require.Nil(t, w.PrimaryTypes())
+	require.Nil(t, w.SecondaryTypes())
+}
+
+func TestAddArtistWatchForeignKeys(t *testing.T) {
+	WithDB(t, func(ctx context.Context, db *DB) {
+		seedUsers(t, ctx, db, "u1")
+		seedArtist(t, ctx, db, "a1")
+
+		require.Error(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u1", ArtistMBzID: "ghost", Status: true}), "unknown artist")
+		require.Error(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "nobody", ArtistMBzID: "a1", Status: true}), "unknown user")
+		require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u1", ArtistMBzID: "a1", Status: true}))
+
+		watches, err := db.UserArtistWatches(ctx, User{ID: "u1"})
+		require.NoError(t, err)
+		require.Len(t, watches, 1)
+	})
+}
+
+func TestAddArtistWatchHonorsContext(t *testing.T) {
+	WithDB(t, func(ctx context.Context, db *DB) {
+		seedUsers(t, ctx, db, "u1")
+		seedArtist(t, ctx, db, "a1")
+
+		cctx, cancel := context.WithCancel(ctx)
+		cancel()
+		require.Error(t, db.AddArtistWatch(cctx, ArtistWatch{UserID: "u1", ArtistMBzID: "a1"}))
+	})
+}
+
 func TestArtistWatchTypeSplit(t *testing.T) {
 	w := ArtistWatch{XXPrimaryTypes: "Album,EP", XXSecondaryTypes: "Live,Remix"}
 	require.Equal(t, []string{"Album", "EP"}, w.PrimaryTypes())
@@ -45,7 +77,7 @@ func TestArtistWatchWatches(t *testing.T) {
 
 func TestAddArtistWatchUpsert(t *testing.T) {
 	WithDB(t, func(ctx context.Context, db *DB) {
-		require.NoError(t, db.AddUser(ctx, User{ID: "u1", Name: "u1"}))
+		require.NoError(t, db.CreateUser(ctx, User{ID: "u1", Name: "u1"}))
 		seedArtist(t, ctx, db, "a1")
 
 		w := ArtistWatch{
@@ -81,10 +113,14 @@ func TestAddArtistWatchUpsert(t *testing.T) {
 
 func TestArtistWatchNotFound(t *testing.T) {
 	WithDB(t, func(ctx context.Context, db *DB) {
+		seedUsers(t, ctx, db, "u1", "u2")
 		got, ok, err := db.ArtistWatch(ctx, "u1", "a1")
 		require.NoError(t, err)
 		require.False(t, ok)
 		require.Equal(t, ArtistWatch{UserID: "u1", ArtistMBzID: "a1"}, got)
+
+		seedArtist(t, ctx, db, "a1")
+		seedArtist(t, ctx, db, "a2")
 
 		// a watch for another user/artist does not match
 		require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u2", ArtistMBzID: "a1", Status: true}))
@@ -97,6 +133,8 @@ func TestArtistWatchNotFound(t *testing.T) {
 
 func TestSameArtistDifferentUsersWatchIndependent(t *testing.T) {
 	WithDB(t, func(ctx context.Context, db *DB) {
+		seedUsers(t, ctx, db, "u1", "u2")
+		seedArtist(t, ctx, db, "a1")
 		require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u1", ArtistMBzID: "a1", Status: true, XXPrimaryTypes: "Album"}))
 		require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u2", ArtistMBzID: "a1", Status: false, XXPrimaryTypes: "EP"}))
 
@@ -116,11 +154,15 @@ func TestSameArtistDifferentUsersWatchIndependent(t *testing.T) {
 
 func TestUserArtistWatches(t *testing.T) {
 	WithDB(t, func(ctx context.Context, db *DB) {
+		seedUsers(t, ctx, db, "u1", "u2")
 		got, err := db.UserArtistWatches(ctx, User{ID: "u1"})
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		require.Empty(t, got)
 
+		for _, id := range []string{"a1", "a2", "a3"} {
+			seedArtist(t, ctx, db, id)
+		}
 		require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u1", ArtistMBzID: "a1", Status: true}))
 		require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u1", ArtistMBzID: "a2", Status: false}))
 		require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u2", ArtistMBzID: "a3", Status: true}))

@@ -2,5 +2,7 @@ package component
 
 templ adminMenu() {
 	@menuItem("Account Settings", "/account")
-	@menuItem("User Management", "/admin/users")
+	if UserFromCtx(ctx).Admin {
+		@menuItem("User Management", "/admin/users")
+	}
 }

@@ -32,7 +32,7 @@ func (t *RefreshStarred) Run(ctx context.Context) error {
 	}
 
 	for _, user := range users {
-		if user.SubsonicPass == "" && user.SubsonicUser == "" {
+		if user.SubsonicPass == "" || user.SubsonicUser == "" {
 			continue
 		}
 
@@ -67,6 +67,11 @@ func (t *RefreshStarred) runUser(ctx context.Context, user database.User) error 
 	})
 
 	for _, starred := range starred {
+		if starred.MBzID == "" {
+			slog.Debug("skipping starred subsonic artist without musicbrainz id", "artist", starred.Name)
+			continue
+		}
+
 		if existingIDs[starred.MBzID] {
 			continue
 		}

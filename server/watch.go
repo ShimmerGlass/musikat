@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"path"
 	"strings"
@@ -18,6 +19,9 @@ func (s *Server) artistWatch(ctx context.Context, rw http.ResponseWriter, r *htt
 
 	artistID := r.PathValue("mbid")
 	artist, err := s.db.Artist(ctx, artistID)
+	if errors.Is(err, database.ErrArtistNotFound) {
+		return notFound(err)
+	}
 	if err != nil {
 		return err
 	}
@@ -37,6 +41,10 @@ func (s *Server) artistWatchUpdate(ctx context.Context, rw http.ResponseWriter, 
 	}
 
 	artistID := r.PathValue("mbid")
+	err = s.requireArtist(ctx, artistID)
+	if err != nil {
+		return err
+	}
 
 	watch, _, err := s.db.ArtistWatch(ctx, user.ID, artistID)
 	if err != nil {

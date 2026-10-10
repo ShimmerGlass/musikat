@@ -276,6 +276,6 @@ func newEnv(t *testing.T) *env {
 
 func (e *env) addUser(t *testing.T, id string) database.User {
 	u := database.User{ID: id, Name: id, SubsonicUser: id, SubsonicPass: "pw"}
-	require.NoError(t, e.db.AddUser(context.Background(), u))
+	require.NoError(t, e.db.CreateUser(context.Background(), u))
 	return u
 }

@@ -208,4 +208,48 @@ func TestReleaseGroupsReleasesError(t *testing.T) {
 	})
 	_, err := m.ReleaseGroupsReleases(context.Background(), "rg1")
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "mbz release group releases")
+}
+
+func TestPaginationStopsOnEmptyPage(t *testing.T) {
+	m, reqs := newTestMBz(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, map[string]any{
+			"release-group-count": 10, "release-groups": []any{},
+			"release-count": 10, "releases": []any{},
+		})
+	})
+
+	rgs, err := m.ArtistReleaseGroups(context.Background(), "a1")
+	require.NoError(t, err)
+	require.Empty(t, rgs)
+	require.Len(t, reqs(), 1)
+
+	rels, err := m.ReleaseGroupsReleases(context.Background(), "rg1")
+	require.NoError(t, err)
+	require.Empty(t, rels)
+	require.Len(t, reqs(), 2)
+}
+
+func TestCancelledContextReturnsPromptly(t *testing.T) {
+	m, reqs := newTestMBz(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, map[string]any{})
+	})
+	m.tick = make(chan time.Time) // never fires
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, err := m.ArtistReleaseGroups(ctx, "a1")
+		require.ErrorIs(t, err, context.Canceled)
+		_, err = m.ReleaseGroupsReleases(ctx, "rg1")
+		require.ErrorIs(t, err, context.Canceled)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not return on cancelled context")
+	}
+	require.Empty(t, reqs())
 }

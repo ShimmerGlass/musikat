@@ -1,0 +1,2 @@
+ALTER TABLE users ADD COLUMN admin INTEGER NOT NULL DEFAULT 0;
+UPDATE users SET admin = 1 WHERE rowid = (SELECT MIN(rowid) FROM users);

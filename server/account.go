@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/shimmerglass/musikat/database"
@@ -30,7 +29,7 @@ func (s *Server) accountUpdate(ctx context.Context, rw http.ResponseWriter, r *h
 		user.XMPPJID = r.Form.Get("xmpp_jid")
 	case "password":
 		if r.Form.Get("new_pass") != r.Form.Get("confirm_pass") {
-			return fmt.Errorf("passwords do not match")
+			return badRequestf("passwords do not match")
 		}
 
 		ok, err := auth.ComparePasswordAndHash(r.Form.Get("current_pass"), user.Password)
@@ -38,7 +37,7 @@ func (s *Server) accountUpdate(ctx context.Context, rw http.ResponseWriter, r *h
 			return err
 		}
 		if !ok {
-			return fmt.Errorf("invalid current password")
+			return badRequestf("invalid current password")
 		}
 
 		hash, err := auth.HashPass(r.Form.Get("new_pass"))
@@ -47,9 +46,11 @@ func (s *Server) accountUpdate(ctx context.Context, rw http.ResponseWriter, r *h
 		}
 
 		user.Password = hash
+	default:
+		return badRequestf("unknown update type")
 	}
 
-	err = s.db.AddUser(ctx, user)
+	err = s.db.UpdateUser(ctx, user)
 	if err != nil {
 		return err
 	}

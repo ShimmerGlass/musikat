@@ -113,7 +113,6 @@ func TestAccountUpdateRequiresLogin(t *testing.T) {
 }
 
 func TestAccountUpdateUnknownType(t *testing.T) {
-	t.Skip("BUG: accountUpdate with an unknown/missing 'type' silently succeeds with a redirect (server/account.go:24-47) instead of rejecting the request")
 	e := newEnv(t)
 	e.addUser("alice", "Alice", "pw")
 	cookie := e.login("alice", "pw")

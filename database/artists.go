@@ -44,6 +44,11 @@ func (d *DB) addArtist(ctx context.Context, artist Artist) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
+	return d.addArtistLocked(ctx, artist)
+}
+
+// addArtistLocked upserts an artist. The caller must hold d.lock.
+func (d *DB) addArtistLocked(ctx context.Context, artist Artist) error {
 	_, err := d.gq.
 		Insert(tableArtists).
 		Rows(artist).
@@ -60,7 +65,12 @@ func (d *DB) addArtist(ctx context.Context, artist Artist) error {
 	return nil
 }
 
+// PutArtist atomically reads the artist, applies do and writes the result.
+// do runs while the write lock is held and must not call back into the DB.
 func (d *DB) PutArtist(ctx context.Context, id string, do func(opt.Option[Artist]) Artist) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	var newArtist Artist
 	existing, err := d.Artist(ctx, id)
 	if errors.Is(err, ErrArtistNotFound) {
@@ -71,7 +81,7 @@ func (d *DB) PutArtist(ctx context.Context, id string, do func(opt.Option[Artist
 		newArtist = do(opt.Some(existing))
 	}
 
-	return d.addArtist(ctx, newArtist)
+	return d.addArtistLocked(ctx, newArtist)
 }
 
 func (d *DB) Artist(ctx context.Context, mbzID string) (Artist, error) {

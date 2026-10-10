@@ -2,7 +2,6 @@ package subsonic
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -39,7 +38,7 @@ func (s *Subsonic) User(user database.User) (*User, error) {
 
 	err := client.Authenticate(user.SubsonicPass)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("subsonic auth: %w", err)
 	}
 
 	return &User{client: client}, nil

@@ -50,7 +50,6 @@ func TestSetupPasswordMismatch(t *testing.T) {
 }
 
 func TestSetupPostDisabledOnceUsersExist(t *testing.T) {
-	t.Skip("BUG: POST /setup (server/setup.go:30-53) does not check that setup is already complete, so an unauthenticated caller can create or overwrite any user (including resetting an existing user's password)")
 	e := newEnv(t)
 	orig := e.addUser("alice", "Alice", "pw")
 	e.do(e.s.setupHandler, http.MethodPost, "/setup", url.Values{
@@ -62,10 +61,26 @@ func TestSetupPostDisabledOnceUsersExist(t *testing.T) {
 }
 
 func TestSetupEmptyLoginOrPassword(t *testing.T) {
-	t.Skip("BUG: setup (server/setup.go) and user creation (server/users.go:48) accept an empty login and empty password; input should be validated")
 	e := newEnv(t)
 	e.do(e.s.setupHandler, http.MethodPost, "/setup", url.Values{}, nil, nil)
 	users, err := e.db.Users(e.ctx)
 	require.NoError(t, err)
 	require.Empty(t, users)
+}
+
+func TestSetupCreatesAdmin(t *testing.T) {
+	e := newEnv(t)
+	rec := e.do(e.s.setupHandler, http.MethodPost, "/setup", url.Values{
+		"login": {" root "}, "name": {"Root"}, "password": {"pw"}, "confirm_password": {"pw"},
+	}, nil, nil)
+	require.Equal(t, http.StatusSeeOther, rec.Code)
+	u, err := e.db.User(e.ctx, "root")
+	require.NoError(t, err)
+	require.True(t, u.Admin)
+
+	// A second setup attempt is refused.
+	rec = e.do(e.s.setupHandler, http.MethodPost, "/setup", url.Values{
+		"login": {"eve"}, "password": {"pw"}, "confirm_password": {"pw"},
+	}, nil, nil)
+	require.Equal(t, http.StatusForbidden, rec.Code)
 }

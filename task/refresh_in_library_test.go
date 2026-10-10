@@ -192,8 +192,6 @@ func TestRefreshInLibraryPartialSongsAreMissing(t *testing.T) {
 }
 
 func TestRefreshInLibraryReleaseWithoutTracksIsNotSongsPresent(t *testing.T) {
-	t.Skip("BUG: release_status.go:75 cachedState uses lo.Every(artistRecordingIDs, rel.RecordingIDs); a cached release with no recordings (empty tracklist on MusicBrainz) makes every release group SongsPresent, even when the library has no songs from it")
-
 	ctx := context.Background()
 	e := newLibEnv(t, oldRG("rg1"))
 	cacheReleases(t, e, "rg1", time.Now(), database.CachedRelease{MBzID: "relA"})
@@ -320,7 +318,7 @@ func TestRefreshInLibraryRunWithoutWatchedArtistsNeedsNoUser(t *testing.T) {
 func TestRefreshInLibraryNoSubsonicUser(t *testing.T) {
 	ctx := context.Background()
 	e := newEnv(t)
-	require.NoError(t, e.db.AddUser(ctx, database.User{ID: "u1", Name: "u1"}))
+	require.NoError(t, e.db.CreateUser(ctx, database.User{ID: "u1", Name: "u1"}))
 	putArtist(t, e.db, artistA)
 	require.NoError(t, e.db.AddArtistWatch(ctx, database.ArtistWatch{UserID: "u1", ArtistMBzID: "a1", Status: true, XXPrimaryTypes: "Album"}))
 	task := NewRefreshInLibrary(e.db, e.mbClient, e.subClient, e.naviClient)

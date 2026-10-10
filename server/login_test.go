@@ -33,6 +33,7 @@ func TestLoginSuccess(t *testing.T) {
 	}
 	require.NotNil(t, cookie)
 	require.True(t, cookie.HttpOnly)
+	require.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
 	require.Equal(t, "/", cookie.Path)
 	// Without "remember" this is a session cookie.
 	require.True(t, cookie.Expires.IsZero())
@@ -70,7 +71,6 @@ func TestLoginNextRedirect(t *testing.T) {
 }
 
 func TestLoginNextOpenRedirect(t *testing.T) {
-	t.Skip("BUG: login redirects to an arbitrary absolute 'next' URL (server/login.go:63-66), an open redirect; only local paths should be accepted")
 	e := newEnv(t)
 	e.addUser("alice", "Alice", "pw")
 	rec := e.do(e.s.loginHandler, http.MethodPost, "/login?next="+url.QueryEscape("https://evil.example/"), url.Values{"user": {"alice"}, "password": {"pw"}}, nil, nil)
@@ -99,11 +99,10 @@ func TestLoginFailures(t *testing.T) {
 }
 
 func TestErrorsReturnOKStatus(t *testing.T) {
-	t.Skip("BUG: handler errors (e.g. failed login, server/server.go:62-65) render the error page with HTTP 200 instead of a 4xx/5xx status")
 	e := newEnv(t)
 	e.addUser("alice", "Alice", "pw")
 	rec := e.do(e.s.loginHandler, http.MethodPost, "/login", url.Values{"user": {"alice"}, "password": {"bad"}}, nil, nil)
-	require.GreaterOrEqual(t, rec.Code, 400)
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
 func TestLogout(t *testing.T) {

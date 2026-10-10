@@ -129,7 +129,6 @@ func TestArtistSubsonicIDSearchAPIError(t *testing.T) {
 }
 
 func TestArtistSubsonicIDEmptyMBzID(t *testing.T) {
-	t.Skip("BUG: subsonic/artist.go:26 compares MBzIDs without checking they are non-empty: an artist with no MBzID matches the first search result that also has no MusicBrainz ID, returning an unrelated artist")
 	f := &fakeServer{
 		search: artistsXML("s1", "Other"),
 		info:   map[string]string{"s1": ""},
@@ -230,4 +229,26 @@ func TestUserAuthenticates(t *testing.T) {
 	require.NotEmpty(t, q["t"])
 	require.NotEmpty(t, q["s"])
 	require.NotContains(t, q, "p", "plaintext password must not be sent")
+}
+
+func TestUserAuthFailureReturnsError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><subsonic-response xmlns="http://subsonic.org/restapi" status="failed" version="1.16.1"><error code="40" message="Wrong username or password"/></subsonic-response>`)
+	}))
+	defer srv.Close()
+
+	u, err := New(Config{URL: srv.URL}).User(database.User{SubsonicUser: "bob", SubsonicPass: "bad"})
+	require.Nil(t, u)
+	require.ErrorContains(t, err, "subsonic auth")
+	require.ErrorContains(t, err, "Wrong username or password")
+}
+
+func TestArtistSubsonicIDIgnoresResultsWithoutMBID(t *testing.T) {
+	f := &fakeServer{
+		search: artistsXML("s1", "Other", "s2", "Name"),
+		info:   map[string]string{"s1": "", "s2": "m"},
+	}
+	id, err := newUser(t, f).ArtistSubsonicID(context.Background(), database.Artist{Name: "Name", MBzID: "m"})
+	require.NoError(t, err)
+	require.Equal(t, "s2", id)
 }

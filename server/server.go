@@ -29,7 +29,7 @@ func (s *Server) Run() error {
 	http.Handle("GET /setup", s.handle(s.setupPage))
 	http.Handle("POST /setup", s.handle(s.setupHandler))
 
-	http.Handle("GET /", s.handle(s.authHandler((s.index))))
+	http.Handle("GET /{$}", s.handle(s.authHandler(s.index)))
 	http.Handle("GET /refresh", s.handle(s.authHandler((s.refresh))))
 
 	http.Handle("GET /login", s.handle(s.loginPage))
@@ -39,10 +39,10 @@ func (s *Server) Run() error {
 	http.Handle("GET /account", s.handle(s.authHandler(s.accountPage)))
 	http.Handle("POST /account", s.handle(s.authHandler(s.accountUpdate)))
 
-	http.Handle("GET /admin/users", s.handle(s.authHandler(s.users)))
-	http.Handle("POST /admin/users/delete", s.handle(s.authHandler(s.userDelete)))
-	http.Handle("GET /admin/users/create", s.handle(s.authHandler(s.userCreatePage)))
-	http.Handle("POST /admin/users/create", s.handle(s.authHandler(s.userCreateHandler)))
+	http.Handle("GET /admin/users", s.handle(s.authHandler(s.adminHandler(s.users))))
+	http.Handle("POST /admin/users/delete", s.handle(s.authHandler(s.adminHandler(s.userDelete))))
+	http.Handle("GET /admin/users/create", s.handle(s.authHandler(s.adminHandler(s.userCreatePage))))
+	http.Handle("POST /admin/users/create", s.handle(s.authHandler(s.adminHandler(s.userCreateHandler))))
 
 	http.Handle("GET /artists/{mbid}", s.handle(s.authHandler(s.artist)))
 	http.Handle("GET /artists/{mbid}/watch", s.handle(s.authHandler(s.watchArtist)))
@@ -64,6 +64,7 @@ func (s *Server) handle(do handler) http.Handler {
 
 		err := do(ctx, w, r)
 		if err != nil {
+			w.WriteHeader(statusFromError(err))
 			_ = component.Error(err).Render(ctx, w)
 		}
 	})

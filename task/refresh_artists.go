@@ -36,6 +36,11 @@ func (t *RefreshArtists) Run(ctx context.Context) error {
 	}
 
 	for _, artist := range artists {
+		if artist.MBzID == "" {
+			slog.Debug("skipping subsonic artist without musicbrainz id", "artist", artist.Name)
+			continue
+		}
+
 		err := t.db.PutArtist(ctx, artist.MBzID, func(o opt.Option[database.Artist]) database.Artist {
 			a := o.TakeOr(artist)
 			a.MBzID = artist.MBzID

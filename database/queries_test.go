@@ -62,7 +62,7 @@ func TestArtistReleaseGroups(t *testing.T) {
 func TestUserWatchedArtistsWithStats(t *testing.T) {
 	WithDB(t, func(ctx context.Context, db *DB) {
 		user := User{ID: "u1", Name: "u1"}
-		require.NoError(t, db.AddUser(ctx, user))
+		require.NoError(t, db.CreateUser(ctx, user))
 
 		a1 := seedArtist(t, ctx, db, "a1")
 		a2 := seedArtist(t, ctx, db, "a2")
@@ -187,4 +187,10 @@ func TestDeleteReleaseGroupNotification(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, got, 1)
 	})
+}
+
+func seedUsers(t *testing.T, ctx context.Context, db *DB, ids ...string) {
+	for _, id := range ids {
+		require.NoError(t, db.CreateUser(ctx, User{ID: id, Name: id}))
+	}
 }

@@ -16,6 +16,8 @@ import (
 	"github.com/shimmerglass/musikat/subsonic"
 )
 
+const refreshArtistBuffer = 32
+
 type task interface {
 	Run(context.Context) error
 }
@@ -31,7 +33,7 @@ type Tasks struct {
 
 	refresh       chan struct{}
 	refreshArtist chan database.Artist
-	running       atomic.Bool
+	running       atomic.Int32
 }
 
 func New(
@@ -45,7 +47,7 @@ func New(
 	return &Tasks{
 		cfg:           cfg,
 		refresh:       make(chan struct{}),
-		refreshArtist: make(chan database.Artist),
+		refreshArtist: make(chan database.Artist, refreshArtistBuffer),
 		tasks: []task{
 			NewRefreshArtists(db, sub),
 			NewRefreshStarred(db, sub),
@@ -57,24 +59,33 @@ func New(
 }
 
 func (t *Tasks) Start() {
+	t.StartContext(context.Background())
+}
+
+// StartContext starts the refresh loop, which stops when ctx is cancelled.
+func (t *Tasks) StartContext(ctx context.Context) {
 	go func() {
 		var tick <-chan time.Time
 		var start chan struct{}
 
 		if t.cfg.Enabled {
-			tick = time.Tick(t.cfg.Interval)
+			ticker := time.NewTicker(t.cfg.Interval)
+			defer ticker.Stop()
+			tick = ticker.C
 			start = make(chan struct{}, 1)
 			start <- struct{}{}
 		}
 
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-tick:
 			case <-start:
 			case <-t.refresh:
 
 			case artist := <-t.refreshArtist:
-				err := t.RunArtist(context.Background(), artist)
+				err := t.RunArtist(ctx, artist)
 				if err != nil {
 					slog.Error(err.Error())
 				}
@@ -82,7 +93,7 @@ func (t *Tasks) Start() {
 				continue
 			}
 
-			err := t.Run(context.Background())
+			err := t.Run(ctx)
 			if err != nil {
 				slog.Error(err.Error())
 			}
@@ -91,8 +102,8 @@ func (t *Tasks) Start() {
 }
 
 func (t *Tasks) Run(ctx context.Context) error {
-	t.running.Store(true)
-	defer t.running.Store(false)
+	t.running.Add(1)
+	defer t.running.Add(-1)
 
 	slog.Info("refresh started")
 
@@ -115,8 +126,8 @@ func (t *Tasks) Run(ctx context.Context) error {
 }
 
 func (t *Tasks) RunArtist(ctx context.Context, artist database.Artist) error {
-	t.running.Store(true)
-	defer t.running.Store(false)
+	t.running.Add(1)
+	defer t.running.Add(-1)
 
 	slog.Info("refresh started", "artist", artist.Name)
 
@@ -146,7 +157,7 @@ func (t *Tasks) RunArtist(ctx context.Context, artist database.Artist) error {
 }
 
 func (t *Tasks) Running() bool {
-	return t.running.Load()
+	return t.running.Load() > 0
 }
 
 func (t *Tasks) Refresh() {
@@ -157,7 +168,11 @@ func (t *Tasks) Refresh() {
 }
 
 func (t *Tasks) RefreshArtist(artist database.Artist) {
-	t.refreshArtist <- artist
+	select {
+	case t.refreshArtist <- artist:
+	default:
+		slog.Warn("artist refresh queue full, dropping request", "artist", artist.Name)
+	}
 }
 
 func (t *Tasks) taskName(to task) string {

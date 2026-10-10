@@ -43,7 +43,16 @@ func (e *env) addUser(id, name, pass string) database.User {
 	hash, err := auth.HashPass(pass)
 	require.NoError(e.t, err)
 	u := database.User{ID: id, Name: name, Password: hash}
-	require.NoError(e.t, e.db.AddUser(e.ctx, u))
+	require.NoError(e.t, e.db.CreateUser(e.ctx, u))
+	return u
+}
+
+func (e *env) addAdmin(id, name, pass string) database.User {
+	e.t.Helper()
+	hash, err := auth.HashPass(pass)
+	require.NoError(e.t, err)
+	u := database.User{ID: id, Name: name, Password: hash, Admin: true}
+	require.NoError(e.t, e.db.CreateUser(e.ctx, u))
 	return u
 }
 
@@ -92,6 +101,13 @@ func (e *env) do(h handler, method, target string, form url.Values, cookie *http
 func (e *env) authed(h userHandler, cookie *http.Cookie, method, target string, form url.Values, pathVals map[string]string) *httptest.ResponseRecorder {
 	e.t.Helper()
 	return e.do(e.s.authHandler(h), method, target, form, cookie, pathVals)
+}
+
+// adminAuthed is like authed but also applies the admin check, as the real
+// admin routes do.
+func (e *env) adminAuthed(h userHandler, cookie *http.Cookie, method, target string, form url.Values, pathVals map[string]string) *httptest.ResponseRecorder {
+	e.t.Helper()
+	return e.do(e.s.authHandler(e.s.adminHandler(h)), method, target, form, cookie, pathVals)
 }
 
 func TestRoutingAndMethods(t *testing.T) {
@@ -146,7 +162,5 @@ func TestRoutingAndMethods(t *testing.T) {
 	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
 	require.Equal(t, "/", resp.Header.Get("Location"))
 
-	if get("GET", "/nope").StatusCode != http.StatusNotFound {
-		t.Skip("BUG: 'GET /' is a catch-all pattern (server/server.go:34), so unknown GET paths hit the index handler (login redirect) instead of returning 404")
-	}
+	require.Equal(t, http.StatusNotFound, get("GET", "/nope").StatusCode)
 }

@@ -70,6 +70,9 @@ func cachedState(
 	}
 
 	for _, rel := range releases {
+		if len(rel.RecordingIDs) == 0 {
+			continue
+		}
 		if lo.Every(artistRecordingIDs, rel.RecordingIDs) {
 			return libraryState{Status: database.LibraryStatusSongsPresent}
 		}

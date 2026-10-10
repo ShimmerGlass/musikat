@@ -67,7 +67,11 @@ func (m *MusicBrainz) ArtistReleaseGroups(ctx context.Context, artistMBzID strin
 	paginator := paginator()
 
 	for {
-		<-m.tick
+		select {
+		case <-m.tick:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 		mbRes, err := m.client.BrowseReleaseGroups(ctx, mbz.ReleaseGroupFilter{
 			ArtistMBID: mbtypes.MBID(artistMBzID),
 			Includes:   []string{"artist-credits"},
@@ -77,7 +81,7 @@ func (m *MusicBrainz) ArtistReleaseGroups(ctx context.Context, artistMBzID strin
 		}
 
 		rgs = append(rgs, mbRes.ReleaseGroups...)
-		if len(rgs) >= mbRes.Count {
+		if len(mbRes.ReleaseGroups) == 0 || len(rgs) >= mbRes.Count {
 			break
 		}
 
@@ -111,17 +115,21 @@ func (m *MusicBrainz) ReleaseGroupsReleases(ctx context.Context, releaseGroupMBz
 	paginator := paginator()
 
 	for {
-		<-m.tick
+		select {
+		case <-m.tick:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 		mbRes, err := m.client.BrowseReleases(ctx, mbz.ReleaseFilter{
 			ReleaseGroupMBID: mbtypes.MBID(releaseGroupMBzID),
 			Includes:         []string{"recordings"},
 		}, paginator)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("mbz release group releases: %w", err)
 		}
 
 		releases = append(releases, mbRes.Releases...)
-		if len(releases) >= mbRes.Count {
+		if len(mbRes.Releases) == 0 || len(releases) >= mbRes.Count {
 			break
 		}
 

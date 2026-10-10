@@ -175,7 +175,7 @@ func TestTasksStartRefreshAndRefreshArtist(t *testing.T) {
 	pt := &perArtistTask{plainTask{calls: &calls, name: "t", ran: ran}}
 	tasks := &Tasks{
 		refresh:       make(chan struct{}),
-		refreshArtist: make(chan database.Artist),
+		refreshArtist: make(chan database.Artist, 32),
 		tasks:         []task{pt},
 	}
 	tasks.Start() // Config.Enabled is false: nothing runs on its own
@@ -215,7 +215,7 @@ func TestTasksStartRunsImmediatelyAndOnInterval(t *testing.T) {
 	tasks := &Tasks{
 		cfg:           Config{Enabled: true, Interval: 50 * time.Millisecond},
 		refresh:       make(chan struct{}),
-		refreshArtist: make(chan database.Artist),
+		refreshArtist: make(chan database.Artist, 32),
 		tasks:         []task{&plainTask{calls: &calls, name: "t", ran: ran}},
 	}
 	tasks.Start()
@@ -271,4 +271,76 @@ func TestTasksRunArtistEndToEnd(t *testing.T) {
 	require.Contains(t, n.msgs[0], "Fresh")
 	require.NoError(t, tasks.RunArtist(ctx, artistA))
 	require.Len(t, n.msgs, 1)
+}
+
+func TestTasksRefreshArtistDoesNotBlockWithoutStart(t *testing.T) {
+	tasks := New(Config{}, nil, nil, nil, nil, nil)
+
+	done := make(chan struct{})
+	go func() {
+		for range 3 * refreshArtistBuffer { // more than the queue holds: extras are dropped
+			tasks.RefreshArtist(database.Artist{Name: "X"})
+		}
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("RefreshArtist blocked")
+	}
+	require.Len(t, tasks.refreshArtist, refreshArtistBuffer)
+}
+
+// gateTask signals on started and then waits for a value on release.
+type gateTask struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (g gateTask) Run(context.Context) error {
+	g.started <- struct{}{}
+	<-g.release
+	return nil
+}
+
+func TestTasksRunningCounterOverlappingRuns(t *testing.T) {
+	g := gateTask{started: make(chan struct{}), release: make(chan struct{})}
+	tasks := &Tasks{tasks: []task{g}}
+
+	done := make(chan error, 2)
+	go func() { done <- tasks.Run(context.Background()) }()
+	<-g.started
+	go func() { done <- tasks.RunArtist(context.Background(), database.Artist{Name: "X"}) }()
+	<-g.started
+	require.True(t, tasks.Running())
+
+	g.release <- struct{}{} // one of them finishes, the other still runs
+	require.NoError(t, <-done)
+	require.True(t, tasks.Running())
+
+	g.release <- struct{}{}
+	require.NoError(t, <-done)
+	require.False(t, tasks.Running())
+}
+
+func TestTasksStartContextStops(t *testing.T) {
+	ran := make(chan struct{}, 100)
+	calls := []string{}
+	tasks := &Tasks{
+		cfg:           Config{Enabled: true, Interval: 10 * time.Millisecond},
+		refresh:       make(chan struct{}),
+		refreshArtist: make(chan database.Artist, 32),
+		tasks:         []task{&plainTask{calls: &calls, name: "t", ran: ran}},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	tasks.StartContext(ctx)
+	<-ran
+	cancel()
+	time.Sleep(50 * time.Millisecond)
+	for len(ran) > 0 {
+		<-ran
+	}
+	time.Sleep(50 * time.Millisecond)
+	require.Empty(t, ran)
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"path"
 	"time"
@@ -18,6 +19,9 @@ func (s *Server) artist(ctx context.Context, rw http.ResponseWriter, r *http.Req
 
 	artistID := r.PathValue("mbid")
 	artist, err := s.db.Artist(ctx, artistID)
+	if errors.Is(err, database.ErrArtistNotFound) {
+		return notFound(err)
+	}
 	if err != nil {
 		return err
 	}
@@ -37,6 +41,11 @@ func (s *Server) artist(ctx context.Context, rw http.ResponseWriter, r *http.Req
 
 func (s *Server) watchArtist(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
 	artistID := r.PathValue("mbid")
+	err := s.requireArtist(ctx, artistID)
+	if err != nil {
+		return err
+	}
+
 	watch, _, err := s.db.ArtistWatch(ctx, user.ID, artistID)
 	if err != nil {
 		return err
@@ -59,6 +68,11 @@ func (s *Server) watchArtist(ctx context.Context, rw http.ResponseWriter, r *htt
 
 func (s *Server) stopWatchArtist(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
 	artistID := r.PathValue("mbid")
+	err := s.requireArtist(ctx, artistID)
+	if err != nil {
+		return err
+	}
+
 	watch, _, err := s.db.ArtistWatch(ctx, user.ID, artistID)
 	if err != nil {
 		return err
@@ -73,4 +87,12 @@ func (s *Server) stopWatchArtist(ctx context.Context, rw http.ResponseWriter, r 
 
 	http.Redirect(rw, r, path.Join("/artists", artistID), http.StatusSeeOther)
 	return nil
+}
+
+func (s *Server) requireArtist(ctx context.Context, artistID string) error {
+	_, err := s.db.Artist(ctx, artistID)
+	if errors.Is(err, database.ErrArtistNotFound) {
+		return notFound(err)
+	}
+	return err
 }

@@ -75,6 +75,7 @@ func TestArtistsEmpty(t *testing.T) {
 
 func TestWatchedArtists(t *testing.T) {
 	WithDB(t, func(ctx context.Context, db *DB) {
+		seedUsers(t, ctx, db, "u1", "u2")
 		for _, id := range []string{"a1", "a2", "a3", "a4"} {
 			seedArtist(t, ctx, db, id)
 		}
@@ -100,17 +101,9 @@ func TestWatchedArtists(t *testing.T) {
 	})
 }
 
-func TestWatchedArtistsIgnoresWatchWithoutArtist(t *testing.T) {
-	WithDB(t, func(ctx context.Context, db *DB) {
-		require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u1", ArtistMBzID: "ghost", Status: true}))
-		got, err := db.WatchedArtists(ctx)
-		require.NoError(t, err)
-		require.Empty(t, got)
-	})
-}
-
 func TestUserWatchedArtists(t *testing.T) {
 	WithDB(t, func(ctx context.Context, db *DB) {
+		seedUsers(t, ctx, db, "u1", "u2")
 		u1 := User{ID: "u1"}
 		for _, a := range []Artist{
 			{MBzID: "a1", Name: "Charlie"},
@@ -147,6 +140,7 @@ func TestUserWatchedArtistsWithStatsEdgeCases(t *testing.T) {
 
 	t.Run("no watched artists", func(t *testing.T) {
 		WithDB(t, func(ctx context.Context, db *DB) {
+			seedUsers(t, ctx, db, "u1", "u2")
 			res, err := db.UserWatchedArtistsWithStats(ctx, User{ID: "u1"})
 			require.NoError(t, err)
 			require.NotNil(t, res)
@@ -156,6 +150,7 @@ func TestUserWatchedArtistsWithStatsEdgeCases(t *testing.T) {
 
 	t.Run("artist without release groups has zero stats", func(t *testing.T) {
 		WithDB(t, func(ctx context.Context, db *DB) {
+			seedUsers(t, ctx, db, "u1", "u2")
 			a := seedArtist(t, ctx, db, "a1")
 			require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u1", ArtistMBzID: "a1", Status: true, XXPrimaryTypes: "Album"}))
 
@@ -168,6 +163,7 @@ func TestUserWatchedArtistsWithStatsEdgeCases(t *testing.T) {
 
 	t.Run("inactive watch and other users excluded", func(t *testing.T) {
 		WithDB(t, func(ctx context.Context, db *DB) {
+			seedUsers(t, ctx, db, "u1", "u2")
 			a1 := seedArtist(t, ctx, db, "a1")
 			a2 := seedArtist(t, ctx, db, "a2")
 			seedRG(t, ctx, db, ReleaseGroup{MBzID: "r1", PrimaryType: "Album", ReleaseDate: "2000", LibraryStatus: LibraryStatusPresent}, a1, a2)
@@ -182,6 +178,7 @@ func TestUserWatchedArtistsWithStatsEdgeCases(t *testing.T) {
 
 	t.Run("type filtering with unknown primary and secondary types", func(t *testing.T) {
 		WithDB(t, func(ctx context.Context, db *DB) {
+			seedUsers(t, ctx, db, "u1", "u2")
 			a1 := seedArtist(t, ctx, db, "a1")
 			require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{
 				UserID: "u1", ArtistMBzID: "a1", Status: true,
@@ -209,6 +206,7 @@ func TestUserWatchedArtistsWithStatsEdgeCases(t *testing.T) {
 
 	t.Run("library statuses", func(t *testing.T) {
 		WithDB(t, func(ctx context.Context, db *DB) {
+			seedUsers(t, ctx, db, "u1", "u2")
 			a1 := seedArtist(t, ctx, db, "a1")
 			require.NoError(t, db.AddArtistWatch(ctx, ArtistWatch{UserID: "u1", ArtistMBzID: "a1", Status: true, XXPrimaryTypes: "Album"}))
 			seedRG(t, ctx, db, ReleaseGroup{MBzID: "r1", PrimaryType: "Album", ReleaseDate: "2000", LibraryStatus: LibraryStatusPresent}, a1)
@@ -229,6 +227,7 @@ func TestUserWatchedArtistsWithStatsEdgeCases(t *testing.T) {
 
 	t.Run("shared release group counted per artist and results ordered by name", func(t *testing.T) {
 		WithDB(t, func(ctx context.Context, db *DB) {
+			seedUsers(t, ctx, db, "u1", "u2")
 			require.NoError(t, db.addArtist(ctx, Artist{MBzID: "a1", Name: "Zed"}))
 			require.NoError(t, db.addArtist(ctx, Artist{MBzID: "a2", Name: "Abe"}))
 			for _, id := range []string{"a1", "a2"} {

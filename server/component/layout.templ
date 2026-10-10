@@ -1,6 +1,9 @@
 package component
 
-import "github.com/shimmerglass/musikat/version"
+import (
+	"github.com/samber/lo"
+	"github.com/shimmerglass/musikat/version"
+)
 
 templ Layout(title string, menu templ.Component) {
 	@page(title) {
@@ -47,7 +50,7 @@ templ Layout(title string, menu templ.Component) {
 							<a href="/" class="text-sm font-medium hover:text-blue-600">
 								Home
 							</a>
-							<a href="/admin/users" class="text-sm font-medium hover:text-blue-600">
+							<a href={ templ.SafeURL(lo.Ternary(user.Admin, "/admin/users", "/account")) } class="text-sm font-medium hover:text-blue-600">
 								Settings
 							</a>
 							@RefreshButton()

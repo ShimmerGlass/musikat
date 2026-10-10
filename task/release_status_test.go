@@ -77,6 +77,7 @@ func TestCachedState(t *testing.T) {
 		{"album match smallest", set("r2", "r1"), []string{"x"}, rels, libraryState{database.LibraryStatusPresent, "r1"}},
 		{"songs present", set(), []string{"x", "y"}, rels, libraryState{Status: database.LibraryStatusSongsPresent}},
 		{"missing", set(), []string{"z"}, rels, libraryState{Status: database.LibraryStatusMissing}},
+		{"release without recordings", set(), []string{"x"}, []database.CachedRelease{{MBzID: "e"}}, libraryState{Status: database.LibraryStatusMissing}},
 		{"no releases", set(), []string{"x"}, nil, libraryState{Status: database.LibraryStatusMissing}},
 	}
 	for _, tc := range tests {

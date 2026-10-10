@@ -24,11 +24,19 @@ type ArtistWatch struct {
 }
 
 func (w ArtistWatch) PrimaryTypes() []string {
-	return strings.Split(w.XXPrimaryTypes, ",")
+	return splitTypes(w.XXPrimaryTypes)
 }
 
 func (w ArtistWatch) SecondaryTypes() []string {
-	return strings.Split(w.XXSecondaryTypes, ",")
+	return splitTypes(w.XXSecondaryTypes)
+}
+
+func splitTypes(s string) []string {
+	if s == "" {
+		return nil
+	}
+
+	return strings.Split(s, ",")
 }
 
 func (w ArtistWatch) Watches(rg ReleaseGroup) bool {
@@ -48,7 +56,7 @@ func (d *DB) AddArtistWatch(ctx context.Context, watch ArtistWatch) error {
 			"primary_types":   goqu.L("excluded.primary_types"),
 			"secondary_types": goqu.L("excluded.secondary_types"),
 		})).
-		Executor().Exec()
+		Executor().ExecContext(ctx)
 
 	if err != nil {
 		return fmt.Errorf("upsert artist watch: %w", err)

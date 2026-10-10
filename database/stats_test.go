@@ -9,6 +9,7 @@ import (
 
 func TestStats(t *testing.T) {
 	WithDB(t, func(ctx context.Context, db *DB) {
+		seedUsers(t, ctx, db, "u1", "u2")
 		got, err := db.Stats(ctx)
 		require.NoError(t, err)
 		require.Equal(t, Stats{}, got)

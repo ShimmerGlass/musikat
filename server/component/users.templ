@@ -54,8 +54,14 @@ templ Users(users []database.User) {
 							{ user.SubsonicUser }
 						</div>
 						<div class="col-span-2">
-							@Bubble("blue") {
-								Admin
+							if user.Admin {
+								@Bubble("blue") {
+									Admin
+								}
+							} else {
+								@Bubble("gray") {
+									User
+								}
 							}
 						</div>
 						<div class="col-span-2 flex justify-end gap-2">
@@ -136,6 +142,19 @@ templ CreateUser() {
 								placeholder="••••••••"
 								class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
 							/>
+						</div>
+						<!-- Admin -->
+						<div class="flex items-center gap-3">
+							<input
+								id="admin"
+								name="admin"
+								type="checkbox"
+								value="on"
+								class="h-4 w-4 rounded border-gray-300"
+							/>
+							<label for="admin" class="text-sm font-medium text-gray-700">
+								Admin
+							</label>
 						</div>
 						<!-- Actions -->
 						<div class="flex items-center justify-between pt-4">

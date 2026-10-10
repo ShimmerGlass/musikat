@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -26,6 +27,9 @@ func (s *Server) loginHandler(ctx context.Context, rw http.ResponseWriter, r *ht
 	password := r.Form.Get("password")
 
 	user, err := s.db.User(ctx, userName)
+	if errors.Is(err, database.ErrUserNotFound) {
+		return unauthorized(fmt.Errorf("invalid user or password"))
+	}
 	if err != nil {
 		return err
 	}
@@ -35,7 +39,7 @@ func (s *Server) loginHandler(ctx context.Context, rw http.ResponseWriter, r *ht
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("invalid password")
+		return unauthorized(fmt.Errorf("invalid user or password"))
 	}
 
 	now := time.Now()
@@ -64,14 +68,10 @@ func (s *Server) loginHandler(ctx context.Context, rw http.ResponseWriter, r *ht
 		Path:     "/",
 		Expires:  expire,
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
 	})
 
-	redirect := "/"
-	if next := r.URL.Query().Get("next"); next != "" {
-		redirect = next
-	}
-
-	http.Redirect(rw, r, redirect, http.StatusSeeOther)
+	http.Redirect(rw, r, localRedirect(r.URL.Query().Get("next")), http.StatusSeeOther)
 	return nil
 }
 
@@ -82,6 +82,7 @@ func (s *Server) logout(ctx context.Context, rw http.ResponseWriter, r *http.Req
 		Path:     "/",
 		Expires:  time.Now().Add(-time.Hour),
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	http.Redirect(rw, r, "/", http.StatusSeeOther)

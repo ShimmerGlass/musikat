@@ -87,7 +87,7 @@ func TestRefreshStarredPerUserAndIdempotent(t *testing.T) {
 	e := newEnv(t)
 	e.addUser(t, "u1")
 	e.addUser(t, "u2")
-	require.NoError(t, e.db.AddUser(ctx, database.User{ID: "u3", Name: "nosub"}))
+	require.NoError(t, e.db.CreateUser(ctx, database.User{ID: "u3", Name: "nosub"}))
 	e.sub.set(nil, []subArtist{{ID: "s1", Name: "Artist", MBzID: "a1"}})
 	task := NewRefreshStarred(e.db, e.subClient)
 
@@ -127,11 +127,9 @@ func TestRefreshStarredNoUsersIsNoop(t *testing.T) {
 }
 
 func TestRefreshStarredPartialCredentialsDoNotBreakOtherUsers(t *testing.T) {
-	t.Skip("BUG: refresh_starred.go:34 only skips users when both Subsonic user and password are empty; a user with just one of them makes sub.User fail and aborts the task for every user (RefreshArtists and RefreshInLibrary require both)")
-
 	ctx := context.Background()
 	e := newEnv(t)
-	require.NoError(t, e.db.AddUser(ctx, database.User{ID: "a-half", Name: "half", SubsonicUser: "x"}))
+	require.NoError(t, e.db.CreateUser(ctx, database.User{ID: "a-half", Name: "half", SubsonicUser: "x"}))
 	e.addUser(t, "b-ok")
 	e.sub.set(nil, []subArtist{{ID: "s1", Name: "Artist", MBzID: "a1"}})
 
@@ -143,8 +141,6 @@ func TestRefreshStarredPartialCredentialsDoNotBreakOtherUsers(t *testing.T) {
 }
 
 func TestRefreshStarredIgnoresArtistsWithoutMusicBrainzID(t *testing.T) {
-	t.Skip("BUG: refresh_starred.go:68 watches starred Subsonic artists that have no MusicBrainz ID, creating an artist and watch with an empty MBzID")
-
 	ctx := context.Background()
 	e := newEnv(t)
 	e.addUser(t, "u1")

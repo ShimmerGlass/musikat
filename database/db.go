@@ -28,6 +28,7 @@ func New(cfg Config) (*DB, error) {
 
 	query := url.Values{}
 	query.Set("_pragma", "journal_mode = WAL")
+	query.Add("_pragma", "foreign_keys(1)")
 	dbURL.RawQuery = query.Encode()
 
 	db, err := sql.Open("sqlite", dbURL.String())
@@ -48,4 +49,9 @@ func New(cfg Config) (*DB, error) {
 		sql: db,
 		gq:  dialect.DB(db),
 	}, nil
+}
+
+// Close closes the underlying database handle.
+func (d *DB) Close() error {
+	return d.sql.Close()
 }

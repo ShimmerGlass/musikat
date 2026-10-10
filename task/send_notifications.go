@@ -99,6 +99,11 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 		}
 
 		artist, err := t.db.Artist(ctx, watch.ArtistMBzID)
+		if errors.Is(err, database.ErrArtistNotFound) {
+			// Orphan watch left by databases predating foreign key enforcement.
+			slog.Warn("skipping watch of unknown artist", "user", user.Name, "artist", watch.ArtistMBzID)
+			continue
+		}
 		if err != nil {
 			return err
 		}

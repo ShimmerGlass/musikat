@@ -37,7 +37,7 @@ func TestNewReopenIdempotent(t *testing.T) {
 
 	db, err := New(Config{Path: path})
 	require.NoError(t, err)
-	require.NoError(t, db.AddUser(ctx, User{ID: "u1", Name: "Alice"}))
+	require.NoError(t, db.CreateUser(ctx, User{ID: "u1", Name: "Alice"}))
 	require.NoError(t, db.addArtist(ctx, Artist{MBzID: "a1", Name: "A"}))
 	var v1 int64
 	require.NoError(t, db.sql.QueryRowContext(ctx, "SELECT version FROM migrations").Scan(&v1))

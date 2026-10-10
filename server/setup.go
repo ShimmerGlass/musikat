@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/shimmerglass/musikat/database"
 	"github.com/shimmerglass/musikat/server/auth"
@@ -24,13 +26,28 @@ func (s *Server) setupPage(ctx context.Context, rw http.ResponseWriter, r *http.
 }
 
 func (s *Server) setupHandler(ctx context.Context, rw http.ResponseWriter, r *http.Request) error {
-	err := r.ParseForm()
+	users, err := s.db.Users(ctx)
 	if err != nil {
 		return err
 	}
+	if len(users) > 0 {
+		return forbidden(fmt.Errorf("setup already completed"))
+	}
 
+	err = r.ParseForm()
+	if err != nil {
+		return badRequest(err)
+	}
+
+	login := strings.TrimSpace(r.Form.Get("login"))
+	if login == "" {
+		return badRequestf("login is required")
+	}
+	if r.Form.Get("password") == "" {
+		return badRequestf("password is required")
+	}
 	if r.Form.Get("password") != r.Form.Get("confirm_password") {
-		return fmt.Errorf("passwords do not match")
+		return badRequestf("passwords do not match")
 	}
 
 	pass, err := auth.HashPass(r.Form.Get("password"))
@@ -39,11 +56,15 @@ func (s *Server) setupHandler(ctx context.Context, rw http.ResponseWriter, r *ht
 	}
 
 	newUser := database.User{
-		ID:       r.Form.Get("login"),
+		ID:       login,
 		Name:     r.Form.Get("name"),
 		Password: pass,
+		Admin:    true,
 	}
-	err = s.db.AddUser(ctx, newUser)
+	err = s.db.CreateFirstUser(ctx, newUser)
+	if errors.Is(err, database.ErrSetupDone) {
+		return forbidden(fmt.Errorf("setup already completed"))
+	}
 	if err != nil {
 		return err
 	}

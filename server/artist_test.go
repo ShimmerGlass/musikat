@@ -100,9 +100,8 @@ func TestWatchUnknownArtist(t *testing.T) {
 	pv := map[string]string{"mbid": "ghost"}
 
 	rec := e.authed(e.s.watchArtist, cookie, http.MethodGet, "/artists/ghost/watch", nil, pv)
-	if rec.Header().Get("Location") != "" {
-		t.Skip("BUG: watching an unknown artist succeeds and redirects (server/artist.go:41-60) instead of reporting artist-not-found")
-	}
+	require.Equal(t, http.StatusNotFound, rec.Code)
+	require.Empty(t, rec.Header().Get("Location"))
 	require.Contains(t, rec.Body.String(), "Something went wrong")
 }
 

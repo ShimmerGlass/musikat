@@ -136,6 +136,11 @@ func (d *DB) addReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
+	return d.addReleaseGroupLocked(ctx, rg)
+}
+
+// addReleaseGroupLocked upserts a release group. The caller must hold d.lock.
+func (d *DB) addReleaseGroupLocked(ctx context.Context, rg ReleaseGroup) error {
 	// releases_fetched_at is deliberately absent from the conflict update: it
 	// is owned by ReplaceReleaseGroupReleases and must survive upserts.
 	_, err := d.gq.Insert(tableReleaseGroups).
@@ -156,7 +161,13 @@ func (d *DB) addReleaseGroup(ctx context.Context, rg ReleaseGroup) error {
 	return nil
 }
 
+// PutReleaseGroup atomically reads the release group, applies do and writes
+// the result. do runs while the write lock is held and must not call back into
+// the DB.
 func (d *DB) PutReleaseGroup(ctx context.Context, id string, do func(opt.Option[ReleaseGroup]) ReleaseGroup) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	var newReleaseGroup ReleaseGroup
 	existing, err := d.ReleaseGroup(ctx, id)
 	if errors.Is(err, ErrReleaseGroupNotFound) {
@@ -167,7 +178,7 @@ func (d *DB) PutReleaseGroup(ctx context.Context, id string, do func(opt.Option[
 		newReleaseGroup = do(opt.Some(existing))
 	}
 
-	return d.addReleaseGroup(ctx, newReleaseGroup)
+	return d.addReleaseGroupLocked(ctx, newReleaseGroup)
 }
 
 func (d *DB) ReleaseGroup(ctx context.Context, mbzID string) (ReleaseGroup, error) {

@@ -53,8 +53,8 @@ func TestRefreshArtistsUpdatesNameKeepsRefreshedAt(t *testing.T) {
 func TestRefreshArtistsSkipsUsersWithoutSubsonic(t *testing.T) {
 	ctx := context.Background()
 	e := newEnv(t)
-	require.NoError(t, e.db.AddUser(ctx, database.User{ID: "a-nosub", Name: "nosub"}))
-	require.NoError(t, e.db.AddUser(ctx, database.User{ID: "b-halfsub", Name: "half", SubsonicUser: "x"}))
+	require.NoError(t, e.db.CreateUser(ctx, database.User{ID: "a-nosub", Name: "nosub"}))
+	require.NoError(t, e.db.CreateUser(ctx, database.User{ID: "b-halfsub", Name: "half", SubsonicUser: "x"}))
 	e.addUser(t, "c-sub")
 	e.sub.set([]subArtist{{ID: "s1", Name: "Artist", MBzID: "a1"}}, nil)
 
@@ -67,7 +67,7 @@ func TestRefreshArtistsSkipsUsersWithoutSubsonic(t *testing.T) {
 func TestRefreshArtistsNoSubsonicUser(t *testing.T) {
 	ctx := context.Background()
 	e := newEnv(t)
-	require.NoError(t, e.db.AddUser(ctx, database.User{ID: "u1", Name: "u1"}))
+	require.NoError(t, e.db.CreateUser(ctx, database.User{ID: "u1", Name: "u1"}))
 
 	require.ErrorContains(t, NewRefreshArtists(e.db, e.subClient).Run(ctx), "no subsonic user")
 }
@@ -83,8 +83,6 @@ func TestRefreshArtistsRunArtistIsNoop(t *testing.T) {
 }
 
 func TestRefreshArtistsIgnoresArtistsWithoutMusicBrainzID(t *testing.T) {
-	t.Skip("BUG: refresh_artists.go:41 stores Subsonic artists that have no MusicBrainz ID (empty getArtistInfo2 musicBrainzId) with an empty primary key; they should be skipped")
-
 	ctx := context.Background()
 	e := newEnv(t)
 	e.addUser(t, "u1")

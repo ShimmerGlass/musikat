@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"sync"
@@ -113,7 +114,10 @@ func newTestDB(t *testing.T) *database.DB {
 }
 
 func seedWatch(t *testing.T, ctx context.Context, db *database.DB, userID string) {
-	require.NoError(t, db.AddUser(ctx, database.User{ID: userID, Name: userID}))
+	require.NoError(t, db.CreateUser(ctx, database.User{ID: userID, Name: userID}))
+	require.NoError(t, db.PutArtist(ctx, "a1", func(opt.Option[database.Artist]) database.Artist {
+		return database.Artist{MBzID: "a1", Name: "Artist"}
+	}))
 	require.NoError(t, db.AddArtistWatch(ctx, database.ArtistWatch{
 		UserID:         userID,
 		ArtistMBzID:    "a1",
@@ -136,6 +140,28 @@ func seedMissingRG(t *testing.T, ctx context.Context, db *database.DB) {
 	}
 	require.NoError(t, db.PutReleaseGroup(ctx, "rg1", func(opt.Option[database.ReleaseGroup]) database.ReleaseGroup { return rg }))
 	require.NoError(t, db.ReplaceReleaseGroupArtists(ctx, rg))
+}
+
+func TestSendNotificationsSkipsOrphanWatch(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "orphan.db")
+	db, err := database.New(database.Config{Path: path})
+	require.NoError(t, err)
+	seedWatch(t, ctx, db, "u1")
+	seedMissingRG(t, ctx, db)
+
+	// Databases predating foreign key enforcement can hold watches of
+	// artists that don't exist; insert one without foreign keys.
+	raw, err := sql.Open("sqlite", "file:"+path)
+	require.NoError(t, err)
+	defer func() { _ = raw.Close() }()
+	_, err = raw.ExecContext(ctx, `INSERT INTO artist_watches (user_id, artist_mb_id, source, status, added_at, primary_types, secondary_types)
+		VALUES ('u1', 'ghost', 'ui', 1, 0, 'Album', '')`)
+	require.NoError(t, err)
+
+	n := &fakeNotifier{}
+	require.NoError(t, NewSendNotifications(db, n, fakeCovers{}).Run(ctx))
+	require.Equal(t, 1, n.sent["u1"])
 }
 
 func TestSendNotificationsRetriesAfterFailure(t *testing.T) {
@@ -193,22 +219,32 @@ func TestSendNotificationsUserFailureDoesNotStopOthers(t *testing.T) {
 	require.Zero(t, n.sent["u1"])
 }
 
+// cancelNotifier cancels a context after the first successful send.
+type cancelNotifier struct {
+	fakeNotifier
+	cancel context.CancelFunc
+}
+
+func (c *cancelNotifier) Send(ctx context.Context, to database.User, msg string) error {
+	err := c.fakeNotifier.Send(ctx, to, msg)
+	c.cancel()
+	return err
+}
+
 func TestSendNotificationsRunReturnsUserErrors(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	db := newTestDB(t)
 	seedWatch(t, ctx, db, "u1")
 	seedWatch(t, ctx, db, "u2")
 	seedMissingRG(t, ctx, db)
 
-	// u1's watch points at an artist that doesn't exist: runUser errors
-	require.NoError(t, db.AddArtistWatch(ctx, database.ArtistWatch{
-		UserID: "u1", ArtistMBzID: "ghost", Status: true, XXPrimaryTypes: "Album",
-	}))
-
-	n := &fakeNotifier{}
+	// u1 is notified, then the context is cancelled so u2's queries fail
+	n := &cancelNotifier{cancel: cancel}
 	err := NewSendNotifications(db, n, fakeCovers{}).Run(ctx)
-	require.Error(t, err)
-	require.Equal(t, 1, n.sent["u2"])
+	require.ErrorContains(t, err, "user u2")
+	require.Equal(t, 1, n.sent["u1"])
+	require.Zero(t, n.sent["u2"])
 }
 
 func TestSendNotificationsMessage(t *testing.T) {

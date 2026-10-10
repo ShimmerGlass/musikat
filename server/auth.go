@@ -85,9 +85,13 @@ func (s *Server) loginRedirect(ctx context.Context, rw http.ResponseWriter, r *h
 	if err != nil {
 		return err
 	}
-	if len(users) == 0 {
+	switch {
+	case len(users) == 0:
 		http.Redirect(rw, r, "/setup", http.StatusSeeOther)
-	} else {
+	case r.Method != http.MethodGet:
+		// Coming back to a POST-only URL after login would be a GET and fail.
+		http.Redirect(rw, r, "/login", http.StatusSeeOther)
+	default:
 		http.Redirect(rw, r, fmt.Sprintf("/login?next=%s", url.QueryEscape(r.URL.String())), http.StatusSeeOther)
 	}
 	return nil

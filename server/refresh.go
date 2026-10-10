@@ -9,9 +9,7 @@ import (
 )
 
 func (s *Server) refresh(ctx context.Context, rw http.ResponseWriter, r *http.Request, user database.User) error {
-	query := r.URL.Query()
-
-	if artistID := query.Get("artist"); artistID != "" {
+	if artistID := r.FormValue("artist"); artistID != "" {
 		artist, err := s.db.Artist(ctx, artistID)
 		if errors.Is(err, database.ErrArtistNotFound) {
 			return notFound(err)
@@ -25,6 +23,6 @@ func (s *Server) refresh(ctx context.Context, rw http.ResponseWriter, r *http.Re
 		s.tasks.Refresh()
 	}
 
-	http.Redirect(rw, r, localRedirect(query.Get("next")), http.StatusSeeOther)
+	http.Redirect(rw, r, localRedirect(r.FormValue("next")), http.StatusSeeOther)
 	return nil
 }

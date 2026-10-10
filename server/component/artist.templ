@@ -33,12 +33,14 @@ templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch d
 					@DropdownMenu("watch-menu") {
 						if watch.Status {
 							<div class="py-2 border-b border-gray-100">
-								<a
-									href={ templ.URL(fmt.Sprintf("%s/stop-watch", artist.UIPath())) }
-									class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-								>
-									Stop watching
-								</a>
+								<form method="post" action={ templ.URL(fmt.Sprintf("%s/stop-watch", artist.UIPath())) }>
+									<button
+										type="submit"
+										class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+									>
+										Stop watching
+									</button>
+								</form>
 							</div>
 							<div class="py-2">
 								<a
@@ -50,12 +52,14 @@ templ Artist(artists []database.ArtistWithStats, artist database.Artist, watch d
 							</div>
 						} else {
 							<div class="py-2">
-								<a
-									href={ templ.URL(fmt.Sprintf("%s/watch", artist.UIPath())) }
-									class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-								>
-									Watch
-								</a>
+								<form method="post" action={ templ.URL(fmt.Sprintf("%s/watch", artist.UIPath())) }>
+									<button
+										type="submit"
+										class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+									>
+										Watch
+									</button>
+								</form>
 							</div>
 						}
 					}

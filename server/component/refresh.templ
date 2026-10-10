@@ -11,7 +11,7 @@ templ ArtistRefreshButton(artist database.Artist) {
 }
 
 templ refreshButton(artistID string) {
-	<form action="/refresh">
+	<form method="post" action="/refresh">
 		{{ refreshRunning := RefreshRunningFromCtx(ctx) }}
 		@Button(BtnCfg{Type: "submit", Disabled: refreshRunning}) {
 			if refreshRunning {

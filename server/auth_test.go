@@ -77,3 +77,12 @@ func TestAuthDeletedUserLosesAccess(t *testing.T) {
 	require.Equal(t, http.StatusSeeOther, rec.Code)
 	require.Contains(t, rec.Header().Get("Location"), "/login")
 }
+
+func TestAuthRedirectPostHasNoNext(t *testing.T) {
+	e := newEnv(t)
+	e.addUser("alice", "Alice", "pw")
+
+	rec := e.do(e.s.authHandler(e.s.watchArtist), http.MethodPost, "/artists/a1/watch", nil, nil, map[string]string{"mbid": "a1"})
+	require.Equal(t, http.StatusSeeOther, rec.Code)
+	require.Equal(t, "/login", rec.Header().Get("Location"))
+}

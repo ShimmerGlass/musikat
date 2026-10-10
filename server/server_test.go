@@ -2,14 +2,12 @@ package server
 
 import (
 	"context"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	opt "github.com/shimmerglass/go-optional"
 	"github.com/shimmerglass/musikat/database"
@@ -114,25 +112,11 @@ func TestRoutingAndMethods(t *testing.T) {
 	e := newEnv(t)
 	e.addUser("alice", "Alice", "pw")
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	addr := l.Addr().String()
-	require.NoError(t, l.Close())
-	e.s.cfg.ListenAddr = addr
-
-	// Run registers on http.DefaultServeMux, so it can only be called once per process.
-	go func() { _ = e.s.Run() }()
+	srv := httptest.NewServer(e.s.Handler())
+	t.Cleanup(srv.Close)
 
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	base := "http://" + addr
-	require.Eventually(t, func() bool {
-		resp, err := client.Get(base + "/login")
-		if err != nil {
-			return false
-		}
-		_ = resp.Body.Close()
-		return true
-	}, 5*time.Second, 20*time.Millisecond)
+	base := srv.URL
 
 	get := func(method, p string) *http.Response {
 		req, err := http.NewRequest(method, base+p, nil)
@@ -146,16 +130,23 @@ func TestRoutingAndMethods(t *testing.T) {
 	require.Equal(t, http.StatusOK, get("GET", "/login").StatusCode)
 
 	// Protected routes redirect to login with next.
-	for _, p := range []string{"/", "/refresh", "/account", "/admin/users", "/admin/users/create", "/artists/x", "/artists/x/watch", "/artists/x/stop-watch", "/artist-watches/x", "/logout"} {
+	for _, p := range []string{"/", "/account", "/admin/users", "/admin/users/create", "/artists/x", "/artist-watches/x"} {
 		resp := get("GET", p)
 		require.Equal(t, http.StatusSeeOther, resp.StatusCode, p)
 		require.Equal(t, "/login?next="+url.QueryEscape(p), resp.Header.Get("Location"), p)
 	}
 
+	// State-changing routes are POST only.
+	for _, p := range []string{"/refresh", "/logout", "/artists/x/watch", "/artists/x/stop-watch"} {
+		require.Equal(t, http.StatusMethodNotAllowed, get("GET", p).StatusCode, p)
+		resp := get("POST", p)
+		require.Equal(t, http.StatusSeeOther, resp.StatusCode, p)
+		require.Contains(t, resp.Header.Get("Location"), "/login", p)
+	}
+
 	// Wrong methods.
 	require.Equal(t, http.StatusMethodNotAllowed, get("POST", "/").StatusCode)
 	require.Equal(t, http.StatusMethodNotAllowed, get("DELETE", "/login").StatusCode)
-	require.Equal(t, http.StatusMethodNotAllowed, get("POST", "/artists/x/watch").StatusCode)
 
 	// Setup is disabled (redirect) once a user exists.
 	resp := get("GET", "/setup")
@@ -163,4 +154,107 @@ func TestRoutingAndMethods(t *testing.T) {
 	require.Equal(t, "/", resp.Header.Get("Location"))
 
 	require.Equal(t, http.StatusNotFound, get("GET", "/nope").StatusCode)
+}
+
+func TestCrossOriginProtection(t *testing.T) {
+	e := newEnv(t)
+	e.addAdmin("alice", "Alice", "pw")
+	e.addArtist("a1", "Radiohead")
+	cookie := e.login("alice", "pw")
+
+	srv := httptest.NewServer(e.s.Handler())
+	t.Cleanup(srv.Close)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+
+	post := func(path string, form url.Values, headers map[string]string) *http.Response {
+		req, err := http.NewRequest(http.MethodPost, srv.URL+path, strings.NewReader(form.Encode()))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(cookie)
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = resp.Body.Close() })
+		return resp
+	}
+
+	cross := map[string]string{"Sec-Fetch-Site": "cross-site"}
+	evilOrigin := map[string]string{"Origin": "https://evil.example"}
+
+	for name, h := range map[string]map[string]string{"cross-site": cross, "evil origin": evilOrigin} {
+		// Watch is not created.
+		resp := post("/artists/a1/watch", nil, h)
+		require.Equal(t, http.StatusForbidden, resp.StatusCode, name)
+		status, _ := e.watchStatus("alice", "a1")
+		require.False(t, status, name)
+
+		// User is not created.
+		resp = post("/admin/users/create", url.Values{"login": {"eve"}, "name": {"Eve"}, "password": {"x"}}, h)
+		require.Equal(t, http.StatusForbidden, resp.StatusCode, name)
+		_, err := e.db.User(e.ctx, "eve")
+		require.ErrorIs(t, err, database.ErrUserNotFound, name)
+
+		// Password is not changed.
+		resp = post("/account", url.Values{"type": {"password"}, "current_pass": {"pw"}, "new_pass": {"new"}, "confirm_pass": {"new"}}, h)
+		require.Equal(t, http.StatusForbidden, resp.StatusCode, name)
+		u, err := e.db.User(e.ctx, "alice")
+		require.NoError(t, err)
+		ok, err := auth.ComparePasswordAndHash("pw", u.Password)
+		require.NoError(t, err)
+		require.True(t, ok, name)
+
+		// Logout is blocked too (cookie not cleared).
+		resp = post("/logout", nil, h)
+		require.Equal(t, http.StatusForbidden, resp.StatusCode, name)
+		require.Empty(t, resp.Cookies(), name)
+	}
+
+	// Same-origin requests work.
+	resp := post("/artists/a1/watch", nil, map[string]string{"Sec-Fetch-Site": "same-origin"})
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	status, _ := e.watchStatus("alice", "a1")
+	require.True(t, status)
+
+	// Origin matching the host is allowed when Sec-Fetch-Site is absent.
+	resp = post("/artists/a1/stop-watch", nil, map[string]string{"Origin": srv.URL})
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	status, _ = e.watchStatus("alice", "a1")
+	require.False(t, status)
+
+	// Non-browser clients (neither Sec-Fetch-Site nor Origin) are allowed by
+	// the stdlib CrossOriginProtection.
+	resp = post("/artists/a1/watch", nil, nil)
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	status, _ = e.watchStatus("alice", "a1")
+	require.True(t, status)
+}
+
+func TestLogoutViaRouterClearsCookie(t *testing.T) {
+	e := newEnv(t)
+	e.addUser("alice", "Alice", "pw")
+	cookie := e.login("alice", "pw")
+
+	srv := httptest.NewServer(e.s.Handler())
+	t.Cleanup(srv.Close)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/logout", nil)
+	require.NoError(t, err)
+	req.AddCookie(cookie)
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	var cleared *http.Cookie
+	for _, c := range resp.Cookies() {
+		if c.Name == authCookie {
+			cleared = c
+		}
+	}
+	require.NotNil(t, cleared)
+	require.Empty(t, cleared.Value)
 }

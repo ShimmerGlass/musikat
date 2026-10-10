@@ -25,33 +25,38 @@ func New(cfg Config, db *database.DB, tasks *task.Tasks) *Server {
 	}
 }
 
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("GET /setup", s.handle(s.setupPage))
+	mux.Handle("POST /setup", s.handle(s.setupHandler))
+
+	mux.Handle("GET /{$}", s.handle(s.authHandler(s.index)))
+	mux.Handle("POST /refresh", s.handle(s.authHandler((s.refresh))))
+
+	mux.Handle("GET /login", s.handle(s.loginPage))
+	mux.Handle("POST /login", s.handle(s.loginHandler))
+	mux.Handle("POST /logout", s.handle(s.authHandler(s.logout)))
+
+	mux.Handle("GET /account", s.handle(s.authHandler(s.accountPage)))
+	mux.Handle("POST /account", s.handle(s.authHandler(s.accountUpdate)))
+
+	mux.Handle("GET /admin/users", s.handle(s.authHandler(s.adminHandler(s.users))))
+	mux.Handle("POST /admin/users/delete", s.handle(s.authHandler(s.adminHandler(s.userDelete))))
+	mux.Handle("GET /admin/users/create", s.handle(s.authHandler(s.adminHandler(s.userCreatePage))))
+	mux.Handle("POST /admin/users/create", s.handle(s.authHandler(s.adminHandler(s.userCreateHandler))))
+
+	mux.Handle("GET /artists/{mbid}", s.handle(s.authHandler(s.artist)))
+	mux.Handle("POST /artists/{mbid}/watch", s.handle(s.authHandler(s.watchArtist)))
+	mux.Handle("POST /artists/{mbid}/stop-watch", s.handle(s.authHandler(s.stopWatchArtist)))
+	mux.Handle("GET /artist-watches/{mbid}", s.handle(s.authHandler(s.artistWatch)))
+	mux.Handle("POST /artist-watches/{mbid}", s.handle(s.authHandler(s.artistWatchUpdate)))
+
+	return http.NewCrossOriginProtection().Handler(mux)
+}
+
 func (s *Server) Run() error {
-	http.Handle("GET /setup", s.handle(s.setupPage))
-	http.Handle("POST /setup", s.handle(s.setupHandler))
-
-	http.Handle("GET /{$}", s.handle(s.authHandler(s.index)))
-	http.Handle("GET /refresh", s.handle(s.authHandler((s.refresh))))
-
-	http.Handle("GET /login", s.handle(s.loginPage))
-	http.Handle("POST /login", s.handle(s.loginHandler))
-	http.Handle("GET /logout", s.handle(s.authHandler(s.logout)))
-
-	http.Handle("GET /account", s.handle(s.authHandler(s.accountPage)))
-	http.Handle("POST /account", s.handle(s.authHandler(s.accountUpdate)))
-
-	http.Handle("GET /admin/users", s.handle(s.authHandler(s.adminHandler(s.users))))
-	http.Handle("POST /admin/users/delete", s.handle(s.authHandler(s.adminHandler(s.userDelete))))
-	http.Handle("GET /admin/users/create", s.handle(s.authHandler(s.adminHandler(s.userCreatePage))))
-	http.Handle("POST /admin/users/create", s.handle(s.authHandler(s.adminHandler(s.userCreateHandler))))
-
-	http.Handle("GET /artists/{mbid}", s.handle(s.authHandler(s.artist)))
-	http.Handle("GET /artists/{mbid}/watch", s.handle(s.authHandler(s.watchArtist)))
-	http.Handle("GET /artists/{mbid}/stop-watch", s.handle(s.authHandler(s.stopWatchArtist)))
-	http.Handle("GET /artist-watches/{mbid}", s.handle(s.authHandler(s.artistWatch)))
-	http.Handle("POST /artist-watches/{mbid}", s.handle(s.authHandler(s.artistWatchUpdate)))
-
 	slog.Info("listening", "addr", s.cfg.ListenAddr)
-	return http.ListenAndServe(s.cfg.ListenAddr, nil)
+	return http.ListenAndServe(s.cfg.ListenAddr, s.Handler())
 }
 
 type handler func(ctx context.Context, rw http.ResponseWriter, r *http.Request) error

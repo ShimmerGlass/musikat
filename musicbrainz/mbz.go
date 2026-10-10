@@ -3,6 +3,7 @@ package musicbrainz
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -16,6 +17,9 @@ import (
 type MusicBrainz struct {
 	client *mbz.Client
 	tick   <-chan time.Time
+
+	coverArtClient  *http.Client
+	coverArtBaseURL string
 }
 
 func New() *MusicBrainz {
@@ -28,6 +32,9 @@ func New() *MusicBrainz {
 	return &MusicBrainz{
 		client: mbc,
 		tick:   time.Tick(time.Second),
+
+		coverArtClient:  newCoverArtClient(),
+		coverArtBaseURL: defaultCoverArtBaseURL,
 	}
 }
 

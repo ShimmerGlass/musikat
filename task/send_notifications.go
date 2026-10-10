@@ -11,18 +11,25 @@ import (
 	"github.com/shimmerglass/musikat/notification"
 )
 
+type coverArtFinder interface {
+	ReleaseGroupCoverURL(ctx context.Context, rgID string) (string, error)
+}
+
 type SendNotifications struct {
 	db       *database.DB
 	notifier notification.Notifier
+	covers   coverArtFinder
 }
 
 func NewSendNotifications(
 	db *database.DB,
 	notifier notification.Notifier,
+	covers coverArtFinder,
 ) *SendNotifications {
 	return &SendNotifications{
 		db:       db,
 		notifier: notifier,
+		covers:   covers,
 	}
 }
 
@@ -118,7 +125,14 @@ func (t *SendNotifications) runUser(ctx context.Context, user database.User) err
 			}
 			notified[rg.MBzID] = struct{}{}
 
-			message := fmt.Sprintf("New release from %s!\n%s\n%s", artist.Name, rg.Name, rg.MBzURL())
+			message := fmt.Sprintf("New release from %s!\n%s (%s)\n%s", artist.Name, rg.Name, rg.TypeLabel(), rg.MBzURL())
+			coverURL, coverErr := t.covers.ReleaseGroupCoverURL(ctx, rg.MBzID)
+			if coverErr != nil {
+				slog.Warn("cover art lookup failed", "release_group", rg.Name, "error", coverErr)
+			} else if coverURL != "" {
+				message += "\n" + coverURL
+			}
+
 			err = t.notifier.Send(ctx, user, message)
 			if err != nil {
 				slog.Error("sending notification failed", "user", user.Name, "release_group", rg.Name, "error", err)

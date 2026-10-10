@@ -41,6 +41,18 @@ type ReleaseGroup struct {
 	Artists []Artist `db:"-" yaml:"artists"`
 }
 
+// TypeLabel returns a human readable type, e.g. "Album (Live, Compilation)".
+func (r ReleaseGroup) TypeLabel() string {
+	label := r.PrimaryType
+	if label == "" {
+		label = "Unknown"
+	}
+	if types := r.SecondaryTypes(); len(types) > 0 {
+		label += " (" + strings.Join(types, ", ") + ")"
+	}
+	return label
+}
+
 func (r ReleaseGroup) SecondaryTypes() []string {
 	if r.XXSecondaryTypes == "" {
 		return nil

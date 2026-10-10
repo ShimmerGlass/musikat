@@ -51,7 +51,7 @@ func New(
 			NewRefreshStarred(db, sub),
 			NewRefreshArtistReleases(db, mbz),
 			NewRefreshInLibrary(db, mbz, sub, navi),
-			NewSendNotifications(db, notifier),
+			NewSendNotifications(db, notifier, mbz),
 		},
 	}
 }

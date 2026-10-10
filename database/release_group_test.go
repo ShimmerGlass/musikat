@@ -60,3 +60,20 @@ func TestReleaseEnd(t *testing.T) {
 		})
 	}
 }
+
+func TestTypeLabel(t *testing.T) {
+	for _, tc := range []struct {
+		primary, secondary, want string
+	}{
+		{"Album", "", "Album"},
+		{"Single", "", "Single"},
+		{"Album", "Live,Compilation", "Album (Live, Compilation)"},
+		{"", "", "Unknown"},
+		{"", "Live", "Unknown (Live)"},
+	} {
+		t.Run(tc.want, func(t *testing.T) {
+			rg := ReleaseGroup{PrimaryType: tc.primary, XXSecondaryTypes: tc.secondary}
+			require.Equal(t, tc.want, rg.TypeLabel())
+		})
+	}
+}

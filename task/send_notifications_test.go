@@ -79,9 +79,19 @@ type fakeNotifier struct {
 	fail   map[string]bool // by user ID
 	sent   map[string]int  // by user ID
 	failed int
+	msgs   []string
 }
 
-func (f *fakeNotifier) Send(_ context.Context, to database.User, _ string) error {
+type fakeCovers struct {
+	url string
+	err error
+}
+
+func (f fakeCovers) ReleaseGroupCoverURL(context.Context, string) (string, error) {
+	return f.url, f.err
+}
+
+func (f *fakeNotifier) Send(_ context.Context, to database.User, msg string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.fail[to.ID] {
@@ -92,6 +102,7 @@ func (f *fakeNotifier) Send(_ context.Context, to database.User, _ string) error
 		f.sent = map[string]int{}
 	}
 	f.sent[to.ID]++
+	f.msgs = append(f.msgs, msg)
 	return nil
 }
 
@@ -134,7 +145,7 @@ func TestSendNotificationsRetriesAfterFailure(t *testing.T) {
 	seedMissingRG(t, ctx, db)
 
 	n := &fakeNotifier{fail: map[string]bool{"u1": true}}
-	task := NewSendNotifications(db, n)
+	task := NewSendNotifications(db, n, fakeCovers{})
 
 	require.NoError(t, task.Run(ctx))
 	require.Equal(t, 1, n.failed)
@@ -165,7 +176,7 @@ func TestSendNotificationsSkipsUnwatchedArtist(t *testing.T) {
 	}))
 
 	n := &fakeNotifier{}
-	require.NoError(t, NewSendNotifications(db, n).Run(ctx))
+	require.NoError(t, NewSendNotifications(db, n, fakeCovers{}).Run(ctx))
 	require.Empty(t, n.sent)
 }
 
@@ -177,7 +188,7 @@ func TestSendNotificationsUserFailureDoesNotStopOthers(t *testing.T) {
 	seedMissingRG(t, ctx, db)
 
 	n := &fakeNotifier{fail: map[string]bool{"u1": true}}
-	require.NoError(t, NewSendNotifications(db, n).Run(ctx))
+	require.NoError(t, NewSendNotifications(db, n, fakeCovers{}).Run(ctx))
 	require.Equal(t, 1, n.sent["u2"])
 	require.Zero(t, n.sent["u1"])
 }
@@ -195,9 +206,36 @@ func TestSendNotificationsRunReturnsUserErrors(t *testing.T) {
 	}))
 
 	n := &fakeNotifier{}
-	err := NewSendNotifications(db, n).Run(ctx)
+	err := NewSendNotifications(db, n, fakeCovers{}).Run(ctx)
 	require.Error(t, err)
 	require.Equal(t, 1, n.sent["u2"])
+}
+
+func TestSendNotificationsMessage(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		covers fakeCovers
+		want   string
+	}{
+		{"cover found", fakeCovers{url: "https://img/c.jpg"}, "New release from Artist!\nRG (Album)\nhttps://musicbrainz.org/release-group/rg1\nhttps://img/c.jpg"},
+		{"no cover", fakeCovers{}, "New release from Artist!\nRG (Album)\nhttps://musicbrainz.org/release-group/rg1"},
+		{"lookup error", fakeCovers{err: errors.New("down")}, "New release from Artist!\nRG (Album)\nhttps://musicbrainz.org/release-group/rg1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			db := newTestDB(t)
+			seedWatch(t, ctx, db, "u1")
+			seedMissingRG(t, ctx, db)
+
+			n := &fakeNotifier{}
+			require.NoError(t, NewSendNotifications(db, n, tc.covers).Run(ctx))
+			require.Equal(t, []string{tc.want}, n.msgs)
+
+			got, err := db.NotifiedReleaseGroupIDs(ctx, "u1")
+			require.NoError(t, err)
+			require.Contains(t, got, "rg1")
+		})
+	}
 }
 
 func TestMarkAllMissing(t *testing.T) {
